@@ -1,0 +1,44 @@
+{
+  "name": "hotel-booking-worker",
+  "version": "1.0.0",
+  "description": "Cloudflare Workers API for hotel booking requests with AlpineBits integration",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "vitest",
+    "type-check": "tsc --noEmit",
+
+    "db:migrate": "wrangler d1 migrations apply hotel-booking-db --remote",
+    "db:migrate:local": "wrangler d1 migrations apply hotel-booking-db --local",
+    "db:migrate:remote": "wrangler d1 migrations apply hotel-booking-db --remote",
+
+    "db:query:local": "wrangler d1 execute hotel-booking-db --local --command",
+    "db:query:remote": "wrangler d1 execute hotel-booking-db --remote --command",
+
+    "db:import:local": "wrangler d1 execute hotel-booking-db --local --file=./examples/hotels-import.sql",
+    "db:import:remote": "wrangler d1 execute hotel-booking-db --remote --file=./examples/hotels-import.sql",
+
+    "db:upsert:local": "wrangler d1 execute hotel-booking-db --local --file=./examples/hotels-upsert.sql",
+    "db:upsert:remote": "wrangler d1 execute hotel-booking-db --remote --file=./examples/hotels-upsert.sql",
+
+    "db:reset:local": "rm -rf .wrangler/state/v3/d1 && npm run db:migrate:local && npm run db:import:local",
+    "db:list:local": "wrangler d1 execute hotel-booking-db --local --command 'SELECT * FROM hotels ORDER BY id'",
+    "db:list:remote": "wrangler d1 execute hotel-booking-db --remote --command 'SELECT * FROM hotels ORDER BY id'",
+    "db:count:local": "wrangler d1 execute hotel-booking-db --local --command 'SELECT COUNT(*) as total FROM hotels'",
+    "db:count:remote": "wrangler d1 execute hotel-booking-db --remote --command 'SELECT COUNT(*) as total FROM hotels'"
+  },
+  "keywords": ["cloudflare-workers", "hono", "alpinebits", "hotel-booking"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "hono": "^4.0.0",
+    "fast-xml-parser": "^4.3.4"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240106.0",
+    "wrangler": "^3.22.0",
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.0"
+  }
+}

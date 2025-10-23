@@ -1,0 +1,291 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OTA_ResRetrieveRS xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xmlns="http://www.opentravel.org/OTA/2003/05"
+                   xsi:schemaLocation="http://www.opentravel.org/OTA/2003/05 OTA_ResRetrieveRS.xsd"
+                   Version="7.000">
+    <Success/>
+    <ReservationsList>
+        <HotelReservation CreateDateTime="2025-10-08T19:28:15.375Z" ResStatus="Requested" RoomStayReservation="true">
+            <UniqueID Type="14" ID="GR_1759951695375_template-hotel_jz3t45"/>
+            <RoomStays>
+                <RoomStay>
+                    <RoomTypes>
+                        <RoomType RoomClassificationCode="42" RoomType="42"/>
+                    </RoomTypes>
+                    <GuestCounts>
+                        <GuestCount Count="3"/>
+                        <GuestCount Count="1" Age="3"/>
+                        <GuestCount Count="1" Age="8"/>
+                    </GuestCounts>
+                    <TimeSpan Start="2025-10-08" End="2025-10-24"/>
+                </RoomStay>
+            </RoomStays>
+            <ResGuests>
+                <ResGuest>
+                    <Profiles>
+                        <ProfileInfo>
+                            <Profile>
+                                <Customer Language="de" Gender="Unknown">
+                                    <PersonName>
+                                        <Surname>imtiaz</Surname>
+                                    </PersonName>
+                                    <Email>kamikamran34@gmail.com</Email>
+                                    <Address>
+                                        <CountryName Code="DE"/>
+                                    </Address>
+                                </Customer>
+                            </Profile>
+                        </ProfileInfo>
+                    </Profiles>
+                </ResGuest>
+            </ResGuests>
+            <ResGlobalInfo>
+                <BasicPropertyInfo HotelCode="TMPL001" HotelName="Template Hotel"/>
+            </ResGlobalInfo>
+        </HotelReservation>
+        <HotelReservation CreateDateTime="2025-10-08T17:05:12.043Z" ResStatus="Requested" RoomStayReservation="true">
+            <UniqueID Type="14" ID="GR_1759943112043_template-hotel_od2nwo"/>
+            <RoomStays>
+                <RoomStay>
+                    <RoomTypes>
+                        <RoomType RoomClassificationCode="42" RoomType="42"/>
+                    </RoomTypes>
+                    <GuestCounts>
+                        <GuestCount Count="3"/>
+                    </GuestCounts>
+                    <TimeSpan Start="2025-10-08" End="2025-10-22"/>
+                </RoomStay>
+            </RoomStays>
+            <ResGuests>
+                <ResGuest>
+                    <Profiles>
+                        <ProfileInfo>
+                            <Profile>
+                                <Customer Language="de" Gender="Male">
+                                    <PersonName>
+                                        <GivenName>test</GivenName>
+                                        <Surname>Test3</Surname>
+                                    </PersonName>
+                                    <Telephone PhoneTechType="1" PhoneNumber="+493232435454"/>
+                                    <Email>kamikamran34@gmail.com</Email>
+                                    <Address>
+                                        <CountryName Code="DE"/>
+                                    </Address>
+                                </Customer>
+                            </Profile>
+                        </ProfileInfo>
+                    </Profiles>
+                </ResGuest>
+            </ResGuests>
+            <ResGlobalInfo>
+                <BasicPropertyInfo HotelCode="TMPL001" HotelName="Template Hotel"/>
+            </ResGlobalInfo>
+        </HotelReservation>
+        <HotelReservation CreateDateTime="2025-10-08T17:04:22.760Z" ResStatus="Requested" RoomStayReservation="true">
+            <UniqueID Type="14" ID="GR_1759943062760_template-hotel_6ze0dr"/>
+            <RoomStays>
+                <RoomStay>
+                    <RoomTypes>
+                        <RoomType RoomClassificationCode="42" RoomType="42"/>
+                    </RoomTypes>
+                    <GuestCounts>
+                        <GuestCount Count="3"/>
+                        <GuestCount Count="1" Age="3"/>
+                    </GuestCounts>
+                    <TimeSpan Start="2025-10-08" End="2025-10-22"/>
+                </RoomStay>
+            </RoomStays>
+            <ResGuests>
+                <ResGuest>
+                    <Profiles>
+                        <ProfileInfo>
+                            <Profile>
+                                <Customer Language="de" Gender="Male">
+                                    <PersonName>
+                                        <GivenName>test</GivenName>
+                                        <Surname>Test</Surname>
+                                    </PersonName>
+                                    <Telephone PhoneTechType="1" PhoneNumber="+493232435454"/>
+                                    <Email>kamikamran34@gmail.com</Email>
+                                    <Address>
+                                        <CountryName Code="DE"/>
+                                    </Address>
+                                </Customer>
+                            </Profile>
+                        </ProfileInfo>
+                    </Profiles>
+                </ResGuest>
+            </ResGuests>
+            <ResGlobalInfo>
+                <BasicPropertyInfo HotelCode="TMPL001" HotelName="Template Hotel"/>
+            </ResGlobalInfo>
+        </HotelReservation>
+        <HotelReservation CreateDateTime="2025-10-08T17:02:57.372Z" ResStatus="Requested" RoomStayReservation="true">
+            <UniqueID Type="14" ID="GR_1759942977372_template-hotel_sus1ct"/>
+            <RoomStays>
+                <RoomStay>
+                    <RoomTypes>
+                        <RoomType RoomClassificationCode="42" RoomType="42"/>
+                    </RoomTypes>
+                    <GuestCounts>
+                        <GuestCount Count="3"/>
+                        <GuestCount Count="1" Age="4"/>
+                        <GuestCount Count="1" Age="6"/>
+                    </GuestCounts>
+                    <TimeSpan Start="2025-10-08" End="2025-10-21"/>
+                </RoomStay>
+            </RoomStays>
+            <ResGuests>
+                <ResGuest>
+                    <Profiles>
+                        <ProfileInfo>
+                            <Profile>
+                                <Customer Language="de" Gender="Male">
+                                    <PersonName>
+                                        <GivenName>test</GivenName>
+                                        <Surname>Test</Surname>
+                                    </PersonName>
+                                    <Telephone PhoneTechType="1" PhoneNumber="+493232435454"/>
+                                    <Email>kamikamran34@gmail.com</Email>
+                                    <Address>
+                                        <CountryName Code="DE"/>
+                                    </Address>
+                                </Customer>
+                            </Profile>
+                        </ProfileInfo>
+                    </Profiles>
+                </ResGuest>
+            </ResGuests>
+            <ResGlobalInfo>
+                <Comments>
+                    <Comment Name="customer comment">
+                        <Text>This is test 2.</Text>
+                    </Comment>
+                </Comments>
+                <BasicPropertyInfo HotelCode="TMPL001" HotelName="Template Hotel"/>
+            </ResGlobalInfo>
+        </HotelReservation>
+        <HotelReservation CreateDateTime="2025-10-08T16:42:19.142Z" ResStatus="Requested" RoomStayReservation="true">
+            <UniqueID Type="14" ID="GR_1759941739142_template-hotel_e3iw10"/>
+            <RoomStays>
+                <RoomStay>
+                    <RoomTypes>
+                        <RoomType RoomClassificationCode="42" RoomType="42"/>
+                    </RoomTypes>
+                    <GuestCounts>
+                        <GuestCount Count="3"/>
+                        <GuestCount Count="1" Age="6"/>
+                    </GuestCounts>
+                    <TimeSpan Start="2025-10-08" End="2025-10-24"/>
+                </RoomStay>
+            </RoomStays>
+            <ResGuests>
+                <ResGuest>
+                    <Profiles>
+                        <ProfileInfo>
+                            <Profile>
+                                <Customer Language="de" Gender="Female">
+                                    <PersonName>
+                                        <GivenName>kamrn</GivenName>
+                                        <Surname>Test</Surname>
+                                    </PersonName>
+                                    <Telephone PhoneTechType="1" PhoneNumber="+493232435454"/>
+                                    <Email>kamikamran34@gmail.com</Email>
+                                    <Address>
+                                        <CountryName Code="DE"/>
+                                    </Address>
+                                </Customer>
+                            </Profile>
+                        </ProfileInfo>
+                    </Profiles>
+                </ResGuest>
+            </ResGuests>
+            <ResGlobalInfo>
+                <Comments>
+                    <Comment Name="customer comment">
+                        <Text>This is test.</Text>
+                    </Comment>
+                </Comments>
+                <BasicPropertyInfo HotelCode="TMPL001" HotelName="Template Hotel"/>
+            </ResGlobalInfo>
+        </HotelReservation>
+        <HotelReservation CreateDateTime="2025-10-08T16:25:00.437Z" ResStatus="Requested" RoomStayReservation="true">
+            <UniqueID Type="14" ID="GR_1759940700437_template-hotel_73l8g1"/>
+            <RoomStays>
+                <RoomStay>
+                    <RoomTypes>
+                        <RoomType RoomClassificationCode="42" RoomType="42"/>
+                    </RoomTypes>
+                    <GuestCounts>
+                        <GuestCount Count="4"/>
+                        <GuestCount Count="1" Age="3"/>
+                    </GuestCounts>
+                    <TimeSpan Start="2025-10-08" End="2025-10-24"/>
+                </RoomStay>
+            </RoomStays>
+            <ResGuests>
+                <ResGuest>
+                    <Profiles>
+                        <ProfileInfo>
+                            <Profile>
+                                <Customer Language="de" Gender="Male">
+                                    <PersonName>
+                                        <GivenName>kamrn</GivenName>
+                                        <Surname>imtiaz</Surname>
+                                    </PersonName>
+                                    <Telephone PhoneTechType="1" PhoneNumber="+493232435454"/>
+                                    <Email>kamikamran34@gmail.com</Email>
+                                    <Address>
+                                        <CountryName Code="DE"/>
+                                    </Address>
+                                </Customer>
+                            </Profile>
+                        </ProfileInfo>
+                    </Profiles>
+                </ResGuest>
+            </ResGuests>
+            <ResGlobalInfo>
+                <BasicPropertyInfo HotelCode="TMPL001" HotelName="Template Hotel"/>
+            </ResGlobalInfo>
+        </HotelReservation>
+        <HotelReservation CreateDateTime="2025-10-07T14:24:00.916Z" ResStatus="Requested" RoomStayReservation="true">
+            <UniqueID Type="14" ID="GR_1759847040916_template-hotel_pqgb0e"/>
+            <RoomStays>
+                <RoomStay>
+                    <RoomTypes>
+                        <RoomType RoomClassificationCode="42" RoomType="42"/>
+                    </RoomTypes>
+                    <GuestCounts>
+                        <GuestCount Count="2"/>
+                        <GuestCount Count="1" Age="4"/>
+                    </GuestCounts>
+                    <TimeSpan Start="2025-10-07" End="2025-10-24"/>
+                </RoomStay>
+            </RoomStays>
+            <ResGuests>
+                <ResGuest>
+                    <Profiles>
+                        <ProfileInfo>
+                            <Profile>
+                                <Customer Language="de" Gender="Female">
+                                    <PersonName>
+                                        <GivenName>kamrn</GivenName>
+                                        <Surname>imtiaz</Surname>
+                                    </PersonName>
+                                    <Telephone PhoneTechType="1" PhoneNumber="+493232435454"/>
+                                    <Email>kamikamran34@gmail.com</Email>
+                                    <Address>
+                                        <CountryName Code="DE"/>
+                                    </Address>
+                                </Customer>
+                            </Profile>
+                        </ProfileInfo>
+                    </Profiles>
+                </ResGuest>
+            </ResGuests>
+            <ResGlobalInfo>
+                <BasicPropertyInfo HotelCode="TMPL001" HotelName="Template Hotel"/>
+            </ResGlobalInfo>
+        </HotelReservation>
+    </ReservationsList>
+</OTA_ResRetrieveRS>
