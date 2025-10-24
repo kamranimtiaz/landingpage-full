@@ -270,6 +270,13 @@ class GalleryDataParser {
 
     const result = [];
     const dataSource = document.querySelector(".data-source");
+
+    // Guard: Return empty array if data source doesn't exist
+    if (!dataSource) {
+      console.warn("GalleryDataParser: .data-source element not found on this page");
+      return (this.cachedData = result);
+    }
+
     const topicItems = dataSource.querySelectorAll("[data-topic-name]");
 
     topicItems.forEach((item) => {
@@ -2452,9 +2459,15 @@ document.addEventListener("click", function (e) {
     if (!card) return;
 
     const nameEl = card.querySelector("[data-room-name]");
+    const codeEl = card.querySelector("[data-room-code]");
     const imgEl = card.querySelector("[data-room-image]");
-    const name = nameEl ? nameEl.textContent.trim() : "";
+    const name = nameEl ? (nameEl.getAttribute("data-room-name") || nameEl.textContent.trim()) : "";
+    const code = codeEl ? (codeEl.getAttribute("data-room-code") || codeEl.textContent.trim()) : "";
     const img = imgEl ? imgEl.getAttribute("src") : "";
+
+    // Create combined value for submission: "CODE|Name"
+    // Format: "DBL|Deluxe Double Room" - easy to parse on server with split('|')
+    const roomValue = code && name ? `${code}|${name}` : (name || "");
 
     if (roomNameTarget) {
       if (roomNameTarget.tagName === "INPUT") {
@@ -2465,7 +2478,7 @@ document.addEventListener("click", function (e) {
     }
 
     if (roomImgTarget) roomImgTarget.src = img;
-    if (roomInput) roomInput.value = name;
+    if (roomInput) roomInput.value = roomValue;
 
     if (roomElement) {
       roomElement.style.display = "block";

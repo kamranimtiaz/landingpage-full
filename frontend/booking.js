@@ -3,6 +3,12 @@
  *****************************************************************************/
 
 document.addEventListener("DOMContentLoaded", function () {
+  // Fix Webflow's automatic "http://#" action attribute
+  const form = document.querySelector("form[data-hotel-code]");
+  if (form && form.getAttribute("action") === "http://#") {
+    form.setAttribute("action", "#");
+  }
+
   let heroSelectedDates = [];
   let heroAdultsCount = 2;
   let heroChildrenCount = 0;
@@ -648,8 +654,11 @@ document.addEventListener("DOMContentLoaded", function () {
   (function customValidationSetup() {
     window.Webflow ||= [];
     window.Webflow.push(() => {
-      const myForm = document.querySelector("form[data-hotel-id]");
-      if (!myForm) return;
+      const myForm = document.querySelector("form[data-hotel-code], form[data-hotel-id]");
+      if (!myForm) {
+        console.error("⚠️ Form with data-hotel-code or data-hotel-id not found!");
+        return;
+      }
 
       console.log("🔧 Initializing custom form handler...");
 

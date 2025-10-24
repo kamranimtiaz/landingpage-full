@@ -270,6 +270,13 @@ class GalleryDataParser {
 
     const result = [];
     const dataSource = document.querySelector(".data-source");
+
+    // Guard: Return empty array if data source doesn't exist
+    if (!dataSource) {
+      console.warn("GalleryDataParser: .data-source element not found on this page");
+      return (this.cachedData = result);
+    }
+
     const topicItems = dataSource.querySelectorAll("[data-topic-name]");
 
     topicItems.forEach((item) => {

@@ -1,2 +1,2 @@
-INSERT INTO hotels (hotel_id, hotel_name, hotel_code) VALUES
-    ('template-hotel', 'Template Hotel', 'TMPL001');
+INSERT OR IGNORE INTO hotels (hotel_name, hotel_code) VALUES
+    ('Template Hotel', 'TMPL001');

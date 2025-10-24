@@ -51,6 +51,8 @@ export interface GuestRequest {
   childrenCount: number;
   childAges: number[];
   selectedRoom?: string;
+  selectedRoomCode?: string;
+  selectedRoomName?: string;
   gender?: 'Male' | 'Female' | '';
   firstName: string;
   lastName: string;
@@ -75,6 +77,8 @@ export interface GuestRequestRow {
   children_count: number;
   child_ages: string | null;
   selected_room: string | null;
+  selected_room_code: string | null;
+  selected_room_name: string | null;
   gender: string | null;
   first_name: string;
   last_name: string;

@@ -90,3 +90,39 @@ export function generateRequestId(hotelId: string): string {
 export function getISO8601Timestamp(): string {
   return new Date().toISOString();
 }
+
+/**
+ * Parse room selection value
+ * Format from frontend: "CODE|Name" or just "Name"
+ * Returns: { code: string | undefined, name: string | undefined, raw: string }
+ */
+export function parseRoomSelection(selectedRoom?: string): {
+  code?: string;
+  name?: string;
+  raw: string;
+} {
+  if (!selectedRoom || selectedRoom.trim() === '') {
+    return { raw: '' };
+  }
+
+  const trimmed = selectedRoom.trim();
+
+  // Check if it contains the separator
+  if (trimmed.includes('|')) {
+    const parts = trimmed.split('|');
+    const code = parts[0]?.trim();
+    const name = parts.slice(1).join('|').trim(); // In case name contains |
+
+    return {
+      code: code || undefined,
+      name: name || undefined,
+      raw: trimmed
+    };
+  }
+
+  // No separator, treat entire value as name
+  return {
+    name: trimmed,
+    raw: trimmed
+  };
+}
