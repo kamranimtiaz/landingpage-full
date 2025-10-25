@@ -9,7 +9,7 @@ const swiperAnimationConfig = {
     },
   },
 };
-console.log("Experience Loaded")
+
 /**
  * Einfaches i18n: Plurale und Texte je nach Sprache
  * - Sprache wird aus <html lang> oder optional body[data-locale] gelesen
@@ -94,13 +94,13 @@ function tCount(nounKey, count) {
 
 function personsSummary(adults, children) {
   const adultsText = tCount("adults", adults);
-  
+
   // Only include children text if there are children (handle null/undefined/negative)
   if (children && children > 0) {
     const childrenText = tCount("children", children);
     return adultsText + ", " + childrenText;
   }
-  
+
   // Return only adults text when no children
   return adultsText;
 }
@@ -108,15 +108,15 @@ function personsSummary(adults, children) {
 // Alternative version with more explicit logic:
 function personsSummaryDetailed(adults, children) {
   const parts = [];
-  
+
   // Always include adults
   parts.push(tCount("adults", adults));
-  
+
   // Only include children if count > 0
   if (children && children > 0) {
     parts.push(tCount("children", children));
   }
-  
+
   return parts.join(", ");
 }
 
@@ -270,13 +270,6 @@ class GalleryDataParser {
 
     const result = [];
     const dataSource = document.querySelector(".data-source");
-
-    // Guard: Return empty array if data source doesn't exist
-    if (!dataSource) {
-      console.warn("GalleryDataParser: .data-source element not found on this page");
-      return (this.cachedData = result);
-    }
-
     const topicItems = dataSource.querySelectorAll("[data-topic-name]");
 
     topicItems.forEach((item) => {
@@ -384,11 +377,93 @@ class GalleryDataParser {
     };
   }
 }
+class URLManager {
+  static getParameter(param) {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get(param);
+  }
+
+  static updateParameter(param, value) {
+    const url = new URL(window.location);
+    url.searchParams.set(param, value);
+    window.history.pushState({ [param]: value }, "", url);
+    console.log(`📍 Updated URL parameter: ${param}=${value}`);
+  }
+
+  static removeParameter(param) {
+    const url = new URL(window.location);
+    url.searchParams.delete(param);
+    window.history.pushState({}, "", url);
+  }
+
+  static getInitialState() {
+    const topic = this.getParameter("topic");
+    const season = this.getParameter("season");
+
+    return {
+      topic: topic ? topic.toLowerCase() : null,
+      season: ["summer", "winter"].includes(season) ? season : null, // Return null if no URL param
+    };
+  }
+
+  static setupBrowserNavigation(callback) {
+    window.addEventListener("popstate", (event) => {
+      const newState = this.getInitialState();
+      if (callback) callback(newState);
+    });
+  }
+}
+
+class SeasonController extends EventTarget {
+  constructor(initialSeason = "summer") {
+    super();
+    this.currentSeason = initialSeason;
+    this.components = new Set();
+  }
+
+  registerComponent(component) {
+    this.components.add(component);
+  }
+
+  unregisterComponent(component) {
+    this.components.delete(component);
+  }
+
+  switchSeason(newSeason) {
+    if (this.currentSeason === newSeason) return;
+
+    const oldSeason = this.currentSeason;
+    this.currentSeason = newSeason;
+
+    // Update URL
+    URLManager.updateParameter("season", newSeason);
+
+    // Notify all registered components
+    this.dispatchEvent(
+      new CustomEvent("seasonChange", {
+        detail: {
+          newSeason,
+          oldSeason,
+          components: Array.from(this.components),
+        },
+      })
+    );
+
+    console.log(`🌍 Season switched from ${oldSeason} to ${newSeason}`);
+  }
+
+  getCurrentSeason() {
+    return this.currentSeason;
+  }
+}
 
 class HeroImageManager {
-  constructor(galleryData, season = "summer") {
+  
+  constructor(galleryData, seasonController) {
     this.data = galleryData;
-    this.season = season;
+    this.seasonController = seasonController;
+    // FIXED: Get season from controller, not hardcoded default
+    this.season = seasonController.getCurrentSeason();
     this.topicToImageMap = this.buildImageMap();
     this.heroImg = document.querySelector(".hero_img");
     this.currentTopic = null;
@@ -396,7 +471,76 @@ class HeroImageManager {
     this.imageCache = new Map();
     this.isTransitioning = false;
 
+    // Register with season controller
+    this.seasonController.registerComponent(this);
+    this.setupSeasonListener();
+
     this.init();
+  }
+
+  setupSeasonListener() {
+    this.seasonController.addEventListener("seasonChange", (e) => {
+      const { newSeason } = e.detail;
+      this.season = newSeason;
+      this.topicToImageMap = this.buildImageMap();
+      this.preloadImages();
+
+      if (
+        this.hasLoadedInitialImage &&
+        this.currentTopic &&
+        this.topicToImageMap[this.currentTopic.toLowerCase()]
+      ) {
+        this.loadHeroImage(this.currentTopic.toLowerCase(), true);
+      }
+    });
+  }
+
+  handleInitialTopicAndSeason() {
+    const initialState = URLManager.getInitialState();
+
+    // FIXED: Use the season from the controller, which is already correctly determined
+    const currentSeason = this.seasonController.getCurrentSeason();
+    
+    // If the determined season is different from what we built the image map with, rebuild it
+    if (currentSeason !== this.season) {
+      this.season = currentSeason;
+      this.topicToImageMap = this.buildImageMap();
+      this.preloadImages();
+      console.log(`🖼️ HeroImageManager: Updated season to ${currentSeason}`);
+    }
+
+    this.showHeroImage();
+
+    setTimeout(() => {
+      this.hasLoadedInitialImage = true;
+
+      if (initialState.topic) {
+        const topicKey = initialState.topic.toLowerCase();
+        if (this.topicToImageMap[topicKey]) {
+          this.loadHeroImage(topicKey, false);
+          this.currentTopic = topicKey;
+          console.log(
+            `🖼️ Loaded initial hero image for topic: ${topicKey} (season: ${this.season})`
+          );
+        }
+        this.clickTopicButton(topicKey);
+      } else {
+        // Load default hero image based on current season
+        const firstTopicButton = document.querySelector("[data-topic]");
+        if (firstTopicButton) {
+          const firstTopic = firstTopicButton
+            .getAttribute("data-topic")
+            .toLowerCase();
+          if (this.topicToImageMap[firstTopic]) {
+            this.loadHeroImage(firstTopic, false);
+            this.currentTopic = firstTopic;
+            console.log(
+              `🖼️ Loaded default hero image for topic: ${firstTopic} (season: ${this.season})`
+            );
+          }
+        }
+      }
+    }, 500);
   }
 
   buildImageMap() {
@@ -426,41 +570,70 @@ class HeroImageManager {
     });
   }
 
-  updateSeason(newSeason, currentTopic = null) {
-    this.season = newSeason;
-    this.topicToImageMap = this.buildImageMap();
-    this.preloadImages();
-
-    if (!this.hasLoadedInitialImage) return;
-
-    const topicToCheck = currentTopic || this.currentTopic;
-    if (topicToCheck && this.topicToImageMap[topicToCheck.toLowerCase()]) {
-      this.loadHeroImage(topicToCheck.toLowerCase(), true);
-    }
-  }
-
   init() {
     if (!this.heroImg) return;
     this.preloadImages();
-    this.handleInitialTopic();
+    this.handleInitialTopicAndSeason();
     this.setupTopicChangeListener();
   }
 
-  handleInitialTopic() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const paramTopic = urlParams.get("topic");
+  // handleInitialTopicAndSeason() {
+  //   const urlParams = new URLSearchParams(window.location.search);
+  //   const paramTopic = urlParams.get("topic");
+  //   const paramSeason = urlParams.get("season");
 
-    this.showHeroImage();
+  //   // If season parameter exists and is different from current season,
+  //   // rebuild the image map with the correct season
+  //   if (paramSeason && paramSeason !== this.season) {
+  //     const validSeasons = ["summer", "winter"];
+  //     if (validSeasons.includes(paramSeason)) {
+  //       this.season = paramSeason;
+  //       this.topicToImageMap = this.buildImageMap();
+  //       this.preloadImages();
+  //       console.log(
+  //         `🌍 HeroImageManager: Updated season to ${paramSeason} from URL`
+  //       );
+  //     }
+  //   }
 
-    setTimeout(() => {
-      this.hasLoadedInitialImage = true;
+  //   this.showHeroImage();
 
-      // If URL has topic parameter, click the corresponding topic button
-      if (paramTopic) {
-        this.clickTopicButton(paramTopic.toLowerCase());
-      }
-    }, 500); // Longer delay to ensure topic buttons are rendered
-  }
+  //   setTimeout(() => {
+  //     this.hasLoadedInitialImage = true;
+
+  //     // If URL has topic parameter, handle it
+  //     if (paramTopic) {
+  //       // First, try to load the hero image directly if we have it
+  //       const topicKey = paramTopic.toLowerCase();
+  //       if (this.topicToImageMap[topicKey]) {
+  //         this.loadHeroImage(topicKey, false); // No animation for initial load
+  //         this.currentTopic = topicKey;
+  //         console.log(
+  //           `🖼️ Loaded initial hero image for topic: ${topicKey} (season: ${this.season})`
+  //         );
+  //       }
+
+  //       // Then click the topic button to ensure UI state is correct
+  //       this.clickTopicButton(topicKey);
+  //     } else {
+  //       // No topic in URL, but we might need to load default hero image
+  //       // based on the first topic button and current season
+  //       const firstTopicButton = document.querySelector("[data-topic]");
+  //       if (firstTopicButton) {
+  //         const firstTopic = firstTopicButton
+  //           .getAttribute("data-topic")
+  //           .toLowerCase();
+  //         if (this.topicToImageMap[firstTopic]) {
+  //           this.loadHeroImage(firstTopic, false);
+  //           this.currentTopic = firstTopic;
+  //           console.log(
+  //             `🖼️ Loaded default hero image for topic: ${firstTopic} (season: ${this.season})`
+  //           );
+  //         }
+  //       }
+  //     }
+  //   }, 500); // Longer delay to ensure topic buttons are rendered
+  // }
 
   clickTopicButton(topicSlug) {
     // Find the topic button with matching data-topic attribute
@@ -680,8 +853,7 @@ class TopicSwiperManager {
     const topic = trigger.getAttribute("data-topic").toLowerCase();
     this.currentTopic = topic;
 
-    // UPDATE URL PARAMETER
-    this.updateURLParameter(topic);
+    URLManager.updateParameter("topic", topic);
 
     const evt = new CustomEvent("topicChange", {
       detail: { topic, manual: true },
@@ -693,21 +865,9 @@ class TopicSwiperManager {
     this.swiper.slideTo(index);
   }
 
-  // Add this new method to TopicSwiperManager class
-  updateURLParameter(topic) {
-    const url = new URL(window.location);
-    url.searchParams.set("topic", topic);
-
-    // Update URL without page reload
-    window.history.pushState({ topic }, "", url);
-
-    console.log(`📍 Updated URL parameter: topic=${topic}`);
-  }
-
   setupDefaultTopic() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const urlTopic = urlParams.get("topic");
-    let defaultTopic = urlTopic ? urlTopic.toLowerCase() : null;
+    const initialState = URLManager.getInitialState();
+    let defaultTopic = initialState.topic;
 
     if (!defaultTopic && this.triggers.length > 0) {
       defaultTopic = this.triggers[0].getAttribute("data-topic").toLowerCase();
@@ -791,10 +951,53 @@ class GalleryTabsRenderer {
   }
 }
 
+// class GalleryImageRenderer {
+//   constructor(jsonData, season = "summer") {
+//     this.data = jsonData;
+//     this.season = season;
+//     this.template = document
+//       .querySelector(".swiper-slide.is-gallery")
+//       ?.cloneNode(true);
+//     this.container = document.querySelector(
+//       ".swiper-slide.is-gallery"
+//     )?.parentElement;
+//   }
+
+//   renderImages() {
+//     if (!this.container || !this.template) return;
+
+//     this.container.innerHTML = "";
+
+//     this.data.forEach((topic) => {
+//       const images = topic.images?.[this.season] || [];
+//       images.forEach((srcUrl) => {
+//         const slideClone = this.template.cloneNode(true);
+//         const slideImg = slideClone?.querySelector("img");
+//         const topicSlug = createTopicSlug(topic.topicname);
+//         slideClone.setAttribute("data-gallery-id", topicSlug);
+//         slideClone.setAttribute("data-topic-target", topicSlug);
+
+//         if (slideImg) {
+//           slideImg.src = srcUrl;
+//           slideImg.alt = topic.galleryname || topic.topicname;
+//         }
+
+//         this.container.appendChild(slideClone);
+//       });
+//     });
+//   }
+
+//   updateSeason(newSeason) {
+//     this.season = newSeason;
+//     this.renderImages();
+//   }
+// }
+
 class GalleryImageRenderer {
-  constructor(jsonData, season = "summer") {
+  constructor(jsonData, season) {
     this.data = jsonData;
-    this.season = season;
+    // FIXED: Don't default to "summer" - require explicit season parameter
+    this.season = season || "summer"; // Only fallback for backwards compatibility
     this.template = document
       .querySelector(".swiper-slide.is-gallery")
       ?.cloneNode(true);
@@ -834,9 +1037,10 @@ class GalleryImageRenderer {
 }
 
 class GallerySwiperManager {
-  constructor(data, season = "summer") {
+  constructor(data, season) {
     this.data = data;
-    this.season = season;
+    // FIXED: Don't default to "summer" - require explicit season parameter
+    this.season = season || "summer"; // Only fallback for backwards compatibility
     this.swiper = null;
     this.triggerElements = [];
     this.tabItems = [];
@@ -1109,14 +1313,137 @@ class GallerySwiperManager {
   }
 }
 
+// class QuoteImageManager {
+//   constructor(galleryData, season) {
+//     this.data = galleryData;
+//     // FIXED: Don't default to "summer" - require explicit season parameter
+//     this.season = season || "summer"; // Only fallback for backwards compatibility
+//     this.topicToImageMap = this.buildImageMap();
+//     this.quoteImg = null;
+//     this.currentTopic = null;
+//     this.init();
+
+//     if (window.seasonController) {
+//       window.seasonController.addEventListener("seasonChange", (e) => {
+//         this.updateSeason(e.detail.newSeason, this.currentTopic);
+//       });
+//     }
+//   }
+
+//   buildImageMap() {
+//     const imageMap = {};
+
+//     this.data.forEach((topic) => {
+//       const topicKey = topic.topicname.toLowerCase();
+//       const quoteImage = topic.quoteImages?.[this.season];
+
+//       if (quoteImage) {
+//         imageMap[topicKey] = quoteImage;
+//       }
+//     });
+
+//     return imageMap;
+//   }
+
+//   updateSeason(newSeason, currentTopic = null) {
+//     this.season = newSeason;
+//     this.topicToImageMap = this.buildImageMap();
+
+//     if (currentTopic && this.topicToImageMap[currentTopic.toLowerCase()]) {
+//       this.loadQuoteImage(currentTopic.toLowerCase());
+//     }
+//   }
+
+//   init() {
+//     this.findQuoteImageElement();
+//     if (!this.quoteImg) return;
+
+//     this.handleInitialTopic();
+//     this.setupTopicChangeListener();
+//   }
+
+//   findQuoteImageElement() {
+//     // First check if video element exists
+//     const quoteVideo = document.querySelector("[data-quote-video]");
+//     if (quoteVideo) {
+//       // Video is present, don't look for image element
+//       this.quoteImg = null;
+//       return;
+//     }
+
+//     // Video not found, look for image element
+//     this.quoteImg = document.querySelector("[data-quote-image]");
+//   }
+
+//   handleInitialTopic() {
+//     const urlParams = new URLSearchParams(window.location.search);
+//     const paramTopic = urlParams.get("topic");
+
+//     if (paramTopic && this.topicToImageMap[paramTopic.toLowerCase()]) {
+//       this.currentTopic = paramTopic.toLowerCase();
+//       this.loadQuoteImage(this.currentTopic);
+//     } else {
+//       this.showQuoteImage();
+//     }
+//   }
+
+//   setupTopicChangeListener() {
+//     document.addEventListener("topicChange", (e) => {
+//       const selectedTopic = e.detail.topic.toLowerCase();
+//       this.currentTopic = selectedTopic;
+//       if (this.topicToImageMap[selectedTopic]) {
+//         this.loadQuoteImage(selectedTopic);
+//       }
+//     });
+//   }
+
+//   loadQuoteImage(topicKey) {
+//     const imageUrl = this.topicToImageMap[topicKey];
+//     if (!imageUrl || !this.quoteImg) return;
+
+//     const tempImg = new Image();
+//     tempImg.src = imageUrl;
+
+//     tempImg.onload = () => {
+//       this.quoteImg.removeAttribute("srcset");
+//       this.quoteImg.removeAttribute("sizes");
+//       this.quoteImg.src = imageUrl;
+
+//       this.showQuoteImage();
+//     };
+
+//     tempImg.onerror = () => {
+//       console.warn(`Failed to load quote image for topic: ${topicKey}`);
+//       this.showQuoteImage();
+//     };
+//   }
+
+//   showQuoteImage() {
+//     if (this.quoteImg) {
+//       this.quoteImg.style.visibility = "visible";
+//       this.quoteImg.style.opacity = "1";
+//     }
+//   }
+
+//   getCurrentTopic() {
+//     return this.currentTopic;
+//   }
+// }
+
 class QuoteImageManager {
-  constructor(galleryData, season = "summer") {
+  constructor(galleryData, season) {
     this.data = galleryData;
-    this.season = season;
+    this.season = season || "summer";
     this.topicToImageMap = this.buildImageMap();
     this.quoteImg = null;
     this.currentTopic = null;
     this.init();
+
+    if (window.seasonController) {
+      window.seasonController.addEventListener("seasonChange", (e) => {
+        this.updateSeason(e.detail.newSeason, this.currentTopic);
+      });
+    }
   }
 
   buildImageMap() {
@@ -1138,8 +1465,50 @@ class QuoteImageManager {
     this.season = newSeason;
     this.topicToImageMap = this.buildImageMap();
 
-    if (currentTopic && this.topicToImageMap[currentTopic.toLowerCase()]) {
-      this.loadQuoteImage(currentTopic.toLowerCase());
+    // FIXED: If no currentTopic is provided, try to determine it from the current state
+    let topicToUse = currentTopic;
+    
+    if (!topicToUse) {
+      // Try to get the current topic from various sources
+      topicToUse = this.getCurrentTopicFromDOM();
+    }
+
+    if (topicToUse && this.topicToImageMap[topicToUse.toLowerCase()]) {
+      this.loadQuoteImage(topicToUse.toLowerCase());
+    } else {
+      // FIXED: If no specific topic, try to load the first available topic's image for the new season
+      this.loadDefaultQuoteImageForSeason();
+    }
+  }
+
+  // FIXED: New method to determine current topic from DOM state
+  getCurrentTopicFromDOM() {
+    // Try to find the currently active topic button
+    const activeTopicButton = document.querySelector(".topic_button.is-active");
+    if (activeTopicButton) {
+      return activeTopicButton.getAttribute("data-topic");
+    }
+
+    // Fallback: try to find the first topic button (which would be the default)
+    const firstTopicButton = document.querySelector(".topic_button[data-topic]");
+    if (firstTopicButton) {
+      return firstTopicButton.getAttribute("data-topic");
+    }
+
+    return null;
+  }
+
+  // FIXED: New method to load default quote image when no specific topic is available
+  loadDefaultQuoteImageForSeason() {
+    // Try to find the first available topic that has a quote image for this season
+    const firstAvailableTopic = Object.keys(this.topicToImageMap)[0];
+    
+    if (firstAvailableTopic) {
+      this.loadQuoteImage(firstAvailableTopic);
+      console.log(`🖼️ QuoteImageManager: Loaded default quote image for season ${this.season}, topic: ${firstAvailableTopic}`);
+    } else {
+      console.log(`⚠️ QuoteImageManager: No quote images available for season ${this.season}`);
+      this.showQuoteImage(); // Just show whatever image is currently there
     }
   }
 
@@ -1172,6 +1541,18 @@ class QuoteImageManager {
       this.currentTopic = paramTopic.toLowerCase();
       this.loadQuoteImage(this.currentTopic);
     } else {
+      // FIXED: If no URL topic, try to determine and load a default topic
+      const defaultTopic = this.getCurrentTopicFromDOM();
+      
+      if (defaultTopic && this.topicToImageMap[defaultTopic.toLowerCase()]) {
+        this.currentTopic = defaultTopic.toLowerCase();
+        this.loadQuoteImage(this.currentTopic);
+        console.log(`🖼️ QuoteImageManager: Loaded default topic ${this.currentTopic} for season ${this.season}`);
+      } else {
+        // Load the first available topic's image as fallback
+        this.loadDefaultQuoteImageForSeason();
+      }
+      
       this.showQuoteImage();
     }
   }
@@ -1179,9 +1560,12 @@ class QuoteImageManager {
   setupTopicChangeListener() {
     document.addEventListener("topicChange", (e) => {
       const selectedTopic = e.detail.topic.toLowerCase();
-      this.currentTopic = selectedTopic;
+      this.currentTopic = selectedTopic; // FIXED: Always update currentTopic
+      
       if (this.topicToImageMap[selectedTopic]) {
         this.loadQuoteImage(selectedTopic);
+      } else {
+        console.warn(`⚠️ QuoteImageManager: No quote image found for topic ${selectedTopic} in season ${this.season}`);
       }
     });
   }
@@ -1199,6 +1583,7 @@ class QuoteImageManager {
       this.quoteImg.src = imageUrl;
 
       this.showQuoteImage();
+      console.log(`🖼️ QuoteImageManager: Loaded quote image for topic ${topicKey}, season ${this.season}`);
     };
 
     tempImg.onerror = () => {
@@ -1294,18 +1679,67 @@ class TopicContentRenderer {
 }
 
 class SeasonSwitchManager {
-  constructor(gallerySystem) {
-    this.gallerySystem = gallerySystem;
+  constructor(seasonController) {
+    this.seasonController = seasonController;
     this.seasonSwitch = document.querySelector(".navbar_season-switch");
     this.init();
   }
 
   init() {
     if (!this.seasonSwitch) return;
+
+    this.setInitialSeasonFromURL();
     this.seasonSwitch.addEventListener(
       "click",
       this.handleSeasonSwitch.bind(this)
     );
+    this.setupBrowserNavigation();
+  }
+
+  setInitialSeasonFromURL() {
+    const initialState = URLManager.getInitialState();
+    const dataDefault = this.seasonSwitch.getAttribute("data-default-season");
+    const defaultSeason = ["summer", "winter"].includes(dataDefault)
+      ? dataDefault
+      : "summer";
+
+    // URL parameter has precedence, otherwise use data-default-season
+    const initialSeason = initialState.season || defaultSeason;
+
+    // Update UI to match initial season
+    const isSummer = initialSeason === "summer";
+    this.seasonSwitch.setAttribute("aria-checked", isSummer ? "true" : "false");
+
+    // Also update the SeasonController if it differs
+    if (this.seasonController.getCurrentSeason() !== initialSeason) {
+      this.seasonController.currentSeason = initialSeason; // Direct assignment to avoid triggering events
+    }
+
+    console.log(
+      `🌍 Initial season: ${initialSeason} (URL: ${
+        initialState.season || "none"
+      }, HTML default: ${dataDefault})`
+    );
+  }
+
+  setupBrowserNavigation() {
+    URLManager.setupBrowserNavigation((newState) => {
+      const currentSeason = this.getCurrentSeason();
+      if (newState.season !== currentSeason) {
+        const isSummer = newState.season === "summer";
+        this.seasonSwitch.setAttribute(
+          "aria-checked",
+          isSummer ? "true" : "false"
+        );
+        this.seasonController.switchSeason(newState.season);
+      }
+    });
+  }
+
+  getCurrentSeason() {
+    return this.seasonSwitch.getAttribute("aria-checked") === "true"
+      ? "summer"
+      : "winter";
   }
 
   handleSeasonSwitch(evt) {
@@ -1316,8 +1750,7 @@ class SeasonSwitchManager {
     const newSeason = isCurrentlySummer ? "winter" : "summer";
 
     el.setAttribute("aria-checked", isCurrentlySummer ? "false" : "true");
-
-    this.gallerySystem.switchSeason(newSeason);
+    this.seasonController.switchSeason(newSeason);
   }
 }
 
@@ -1326,7 +1759,31 @@ class GallerySystem {
     this.parser = new GalleryDataParser();
     this.data = this.parser.parse();
     console.log(this.data);
-    this.currentSeason = "summer";
+
+    // FIXED: Determine the actual initial season BEFORE creating any components
+    const initialState = URLManager.getInitialState();
+    const seasonSwitch = document.querySelector(".navbar_season-switch");
+    const htmlDefaultSeason = seasonSwitch?.getAttribute("data-default-season");
+    
+    // Validate HTML default season
+    const validSeasons = ["summer", "winter"];
+    const fallbackSeason = "summer"; // Only used as absolute fallback
+    
+    let finalInitialSeason;
+    
+    // Priority order: URL parameter > HTML data attribute > fallback
+    if (initialState.season && validSeasons.includes(initialState.season)) {
+      finalInitialSeason = initialState.season;
+    } else if (htmlDefaultSeason && validSeasons.includes(htmlDefaultSeason)) {
+      finalInitialSeason = htmlDefaultSeason;
+    } else {
+      finalInitialSeason = fallbackSeason;
+    }
+
+    console.log(`🌍 Determined initial season: ${finalInitialSeason}`);
+
+    // FIXED: Initialize SeasonController with the correctly determined season
+    this.seasonController = new SeasonController(finalInitialSeason);
     this.currentTopic = null;
 
     this.heroImageManager = null;
@@ -1343,7 +1800,8 @@ class GallerySystem {
     this.initializeComponents();
     this.setupEventListeners();
 
-    new SeasonSwitchManager(this);
+    // Pass the season controller to SeasonSwitchManager
+    new SeasonSwitchManager(this.seasonController);
   }
 
   renderStaticContent() {
@@ -1356,47 +1814,66 @@ class GallerySystem {
     const topicContentRenderer = new TopicContentRenderer(this.data);
   }
 
-  initializeComponents() {
-    this.heroImageManager = new HeroImageManager(this.data, this.currentSeason);
-    this.galleryImageRenderer = new GalleryImageRenderer(
-      this.data,
-      this.currentSeason
-    );
-    this.galleryImageRenderer.renderImages();
-    this.quoteImageManager = new QuoteImageManager(
-      this.data,
-      this.currentSeason
-    );
-
-    // Initialize Swiper managers
-    this.topicSwiperManager = new TopicSwiperManager(this.data);
-    this.gallerySwiperManager = new GallerySwiperManager(
-      this.data,
-      this.currentSeason
-    );
-  }
-
   setupEventListeners() {
     document.addEventListener("topicChange", (e) => {
       this.currentTopic = e.detail.topic.toLowerCase();
     });
   }
 
-  switchSeason(newSeason) {
-    this.currentSeason = newSeason;
+  initializeComponents() {
+    // FIXED: Get the actual current season from the controller, not hardcoded
+    const currentSeason = this.seasonController.getCurrentSeason();
+    console.log(`🔧 Initializing components with season: ${currentSeason}`);
 
-    const currentTopic = this.heroImageManager.getCurrentTopic();
+    this.heroImageManager = new HeroImageManager(
+      this.data,
+      this.seasonController
+    );
 
-    this.heroImageManager.updateSeason(newSeason, currentTopic);
-    this.galleryImageRenderer.updateSeason(newSeason);
-    this.quoteImageManager.updateSeason(newSeason, this.currentTopic);
+    // FIXED: Initialize with the correct season, not hardcoded summer
+    this.galleryImageRenderer = new GalleryImageRenderer(
+      this.data,
+      currentSeason
+    );
+    this.galleryImageRenderer.renderImages();
 
-    // Update gallery swiper manager - this handles the smooth transition internally
-    if (this.gallerySwiperManager) {
-      this.gallerySwiperManager.updateSeason(newSeason);
-    }
+    this.quoteImageManager = new QuoteImageManager(this.data, currentSeason);
 
-    // No topicChange events during season switch
+    // Initialize Swiper managers
+    this.topicSwiperManager = new TopicSwiperManager(this.data);
+    
+    // FIXED: Initialize with correct season
+    this.gallerySwiperManager = new GallerySwiperManager(
+      this.data,
+      currentSeason
+    );
+
+    // Register components with season controller
+    this.seasonController.registerComponent(this.galleryImageRenderer);
+    this.seasonController.registerComponent(this.quoteImageManager);
+    this.seasonController.registerComponent(this.gallerySwiperManager);
+
+    // Setup season change listeners
+    this.setupSeasonChangeListeners();
+  }
+
+  setupSeasonChangeListeners() {
+    this.seasonController.addEventListener("seasonChange", (e) => {
+      const { newSeason } = e.detail;
+
+      // Update components that don't auto-register
+      if (this.galleryImageRenderer) {
+        this.galleryImageRenderer.updateSeason(newSeason);
+      }
+
+      if (this.quoteImageManager) {
+        this.quoteImageManager.updateSeason(newSeason, this.currentTopic);
+      }
+
+      if (this.gallerySwiperManager) {
+        this.gallerySwiperManager.updateSeason(newSeason);
+      }
+    });
   }
 }
 
@@ -1448,6 +1925,791 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 
+/******************************************************************************
+ * DATE PICKER & FORM SETUP
+ *****************************************************************************/
+
+document.addEventListener("DOMContentLoaded", function () {
+  let heroSelectedDates = [];
+  let heroAdultsCount = 2;
+  let heroChildrenCount = 0;
+  let formAdultsCount = 2;
+  let formChildrenCount = 0;
+  let formDateInstance = null;
+
+  // Kinder-Alter Felder anzeigen/ausblenden je nach Anzahl
+  function updateChildAgeItems(childCount) {
+    const wrapper = document.querySelector("[data-child-age-element]");
+    if (!wrapper) return;
+    const items = wrapper.querySelectorAll("[data-child-age-item]");
+    const count = Math.max(0, Math.min(childCount || 0, items.length));
+
+    // Wrapper Sichtbarkeit
+    if (count > 0) {
+      wrapper.style.display = "block";
+      wrapper.setAttribute("aria-hidden", "false");
+    } else {
+      wrapper.style.display = "none";
+      wrapper.setAttribute("aria-hidden", "true");
+    }
+
+    items.forEach((item, index) => {
+      const shouldShow = index < count;
+      const inputs = item.querySelectorAll("input, select, textarea");
+      if (shouldShow) {
+        item.style.display = "block";
+        item.setAttribute("aria-hidden", "false");
+        // Aktivieren und Namen wiederherstellen
+        inputs.forEach((inp) => {
+          if (inp.dataset.originalName && !inp.name) {
+            inp.name = inp.dataset.originalName;
+          }
+          inp.disabled = false;
+        });
+        // Required aktivieren (wird von der bestehenden Validierung genutzt)
+        item.setAttribute("data-required", "");
+      } else {
+        item.style.display = "none";
+        item.setAttribute("aria-hidden", "true");
+        // Required deaktivieren, damit Validierung nicht greift
+        item.removeAttribute("data-required");
+        // Eingaben leeren und von Submission ausschließen
+        inputs.forEach((inp) => {
+          if (!inp.dataset.originalName) {
+            inp.dataset.originalName = inp.getAttribute("name") || "";
+          }
+          inp.value = "";
+          inp.disabled = true;
+          inp.removeAttribute("name");
+        });
+      }
+    });
+  }
+
+  // Hilfsfunktionen: Limitierung und Button-States für Kinderzahl
+  function getMaxChildrenSelectable() {
+    const wrapper = document.querySelector("[data-child-age-element]");
+    if (!wrapper) return Infinity; // Kein Altersbereich vorhanden → kein hartes Limit
+    const items = wrapper.querySelectorAll("[data-child-age-item]");
+    const len = items ? items.length : 0;
+    return len > 0 ? len : Infinity; // Wenn 0 Items vorhanden, nicht künstlich auf 0 deckeln
+  }
+
+  function clampChildrenCount(value) {
+    const max = getMaxChildrenSelectable();
+    let v = typeof value === "number" ? value : 0;
+    if (v < 0) v = 0;
+    if (max !== Infinity && v > max) v = max;
+    return v;
+  }
+
+  function updateChildPlusMinusState(wrapperEl, currentCount) {
+    if (!wrapperEl) return;
+    const minusB = wrapperEl.querySelector('[data-controls="minus"]');
+    const plusB = wrapperEl.querySelector('[data-controls="plus"]');
+    if (minusB) {
+      if (currentCount === 0) minusB.classList.add("is-disabled");
+      else minusB.classList.remove("is-disabled");
+    }
+    const max = getMaxChildrenSelectable();
+    if (plusB) {
+      if (max !== Infinity && currentCount >= max)
+        plusB.classList.add("is-disabled");
+      else plusB.classList.remove("is-disabled");
+    }
+  }
+
+  function formatFancyRange(selectedDates, instance) {
+    if (!selectedDates || selectedDates.length < 1) return "";
+    return selectedDates
+      .map(function (d) {
+        return instance.formatDate(d, instance.config.dateFormat);
+      })
+      .join(" bis ");
+  }
+
+  function formatTechnicalRange(selectedDates) {
+    if (!selectedDates || selectedDates.length < 1) return "";
+    return selectedDates
+      .map(function (d) {
+        let yyyy = d.getFullYear();
+        let mm = ("0" + (d.getMonth() + 1)).slice(-2);
+        let dd = ("0" + d.getDate()).slice(-2);
+        return yyyy + "-" + mm + "-" + dd;
+      })
+      .join(" - ");
+  }
+
+  function updateNightsDisplay(selectedDates) {
+    const nightsEl = document.querySelector("[data-summary-nights]");
+    const container = nightsEl
+      ? nightsEl.closest(".form_picker-nights-wrapper")
+      : null;
+
+    if (!nightsEl || !container) return;
+
+    if (!selectedDates || selectedDates.length < 2) {
+      container.style.visibility = "hidden";
+      return;
+    }
+
+    const diff = Math.round((selectedDates[1] - selectedDates[0]) / 86400000);
+    const nights = diff < 1 ? 1 : diff;
+    container.style.visibility = "visible";
+
+    const label = tCount("nights", nights);
+    nightsEl.textContent = label;
+    // Suffix-Text setzen (bevorzugt data-Attribut, sonst <em> im Wrapper)
+    const suffixEl =
+      container.querySelector("[data-summary-nights-suffix]") ||
+      container.querySelector("em");
+    if (suffixEl) {
+      suffixEl.textContent = t("nightsSuffix");
+    }
+  }
+
+  if (window.innerWidth >= 992) {
+    setTimeout(function () {
+      const compEl = document.querySelector(".picker_component");
+      if (compEl) compEl.classList.add("show");
+
+      flatpickr(".picker_date", {
+        mode: "range",
+        dateFormat: "D., d. M.",
+        minDate: "today",
+        locale: resolveFlatpickrLocale(),
+        static: true,
+        position: "above",
+        onReady: function (selectedDates, dateStr, instance) {
+          const cal = instance.calendarContainer;
+          if (cal) {
+            cal.classList.add("picker_initial-position");
+            const extra = cal.querySelectorAll("input[name^='field']");
+            extra.forEach((f) => f.removeAttribute("name"));
+          }
+        },
+        onChange: function (sel, ds, inst) {
+          heroSelectedDates = sel;
+          const heroTextEl = document.querySelector(
+            '[data-picker="date-text"]'
+          );
+          if (heroTextEl) {
+            if (heroTextEl.value !== undefined) {
+              heroTextEl.value = ds || t("selectDates");
+            } else {
+              heroTextEl.textContent = ds || t("selectDates");
+            }
+          }
+        },
+      });
+
+      (function () {
+        const pickerTrigger = document.querySelector(
+          '[data-open-popup-persons=""]'
+        );
+        const pickerPopup = document.querySelector('[data-popup-persons=""]');
+        const pickerText = document.querySelector(
+          '[data-picker="persons-text"]'
+        );
+        const adultsCounterText = document.querySelector(
+          '[data-counter="adults-text"]'
+        );
+        const childrenCounterText = document.querySelector(
+          '[data-counter="childs-text"]'
+        );
+        const closeButton = pickerPopup
+          ? pickerPopup.querySelector('[data-custom="submit-person"]')
+          : null;
+        const controls = pickerPopup
+          ? pickerPopup.querySelectorAll("[data-controls]")
+          : null;
+        if (!pickerTrigger || !pickerPopup || !closeButton || !controls) return;
+
+        pickerTrigger.addEventListener("click", function () {
+          if (pickerPopup.getAttribute("aria-hidden") === "true") {
+            pickerPopup.style.display = "block";
+            pickerPopup.style.opacity = 0;
+
+            requestAnimationFrame(() => {
+              pickerPopup.style.opacity = 1;
+              pickerPopup.setAttribute("aria-hidden", "false");
+              pickerTrigger.setAttribute("aria-expanded", "true");
+            });
+          }
+        });
+
+        function closePopup() {
+          // Erst den Fokus entfernen
+          const focusedElement = document.activeElement;
+          if (focusedElement && pickerPopup.contains(focusedElement)) {
+            focusedElement.blur();
+          }
+
+          pickerTrigger.setAttribute("aria-expanded", "false");
+          pickerPopup.style.opacity = 0;
+
+          // Warten auf das Ende der Animation
+          setTimeout(() => {
+            pickerPopup.style.display = "none";
+            pickerPopup.setAttribute("aria-hidden", "true");
+          }, 300);
+        }
+
+        closeButton.addEventListener("click", function () {
+          if (pickerText) {
+            const txt = personsSummary(heroAdultsCount, heroChildrenCount);
+            if (pickerText.value !== undefined) {
+              pickerText.value = txt;
+            } else {
+              pickerText.textContent = txt;
+            }
+          }
+          closePopup();
+        });
+
+        document.addEventListener("click", function (e) {
+          if (!pickerPopup.contains(e.target) && e.target !== pickerTrigger) {
+            closePopup();
+          }
+        });
+
+        controls.forEach(function (ctrl) {
+          ctrl.addEventListener("click", function () {
+            const t = ctrl.getAttribute("data-controls");
+            const wrap = ctrl.closest(".picker_persons-wrapper");
+            const cEl = wrap.querySelector("[data-counter]");
+            const cType = cEl ? cEl.dataset.counter : "";
+            if (cType === "adults-text") {
+              if (t === "plus") heroAdultsCount++;
+              else if (t === "minus" && heroAdultsCount > 1) heroAdultsCount--;
+              if (adultsCounterText) {
+                const valA = tCount("adults", heroAdultsCount);
+                if (adultsCounterText.value !== undefined)
+                  adultsCounterText.value = valA;
+                else adultsCounterText.textContent = valA;
+              }
+              const minusB = wrap.querySelector('[data-controls="minus"]');
+              if (minusB) {
+                if (heroAdultsCount === 1) minusB.classList.add("is-disabled");
+                else minusB.classList.remove("is-disabled");
+              }
+            } else if (cType === "childs-text") {
+              if (t === "plus") heroChildrenCount++;
+              else if (t === "minus" && heroChildrenCount > 0)
+                heroChildrenCount--;
+              heroChildrenCount = clampChildrenCount(heroChildrenCount);
+              if (childrenCounterText) {
+                const valC = tCount("children", heroChildrenCount);
+                if (childrenCounterText.value !== undefined)
+                  childrenCounterText.value = valC;
+                else childrenCounterText.textContent = valC;
+              }
+              updateChildPlusMinusState(wrap, heroChildrenCount);
+            }
+          });
+        });
+        // Initial-States für Kinderreihe im Hero-Popup
+        const childRow = Array.from(
+          pickerPopup.querySelectorAll(".picker_persons-wrapper")
+        ).find(
+          (w) =>
+            w.querySelector("[data-counter]")?.dataset.counter === "childs-text"
+        );
+        if (childRow)
+          updateChildPlusMinusState(
+            childRow,
+            clampChildrenCount(heroChildrenCount)
+          );
+      })();
+
+      const heroRequestBtn = document.querySelector(
+        '[data-custom="transfer-hero-data"]'
+      );
+      if (heroRequestBtn) {
+        heroRequestBtn.addEventListener("click", function () {
+          if (heroSelectedDates && heroSelectedDates.length > 0) {
+            window.__heroData = {
+              dates: heroSelectedDates,
+              adults: heroAdultsCount,
+              children: heroChildrenCount,
+            };
+
+            // Update form date
+            if (formDateInstance) {
+              formDateInstance.setDate(window.__heroData.dates, false);
+              const fancy = formatFancyRange(
+                window.__heroData.dates,
+                formDateInstance
+              );
+              const tech = formatTechnicalRange(window.__heroData.dates);
+
+              const formDateVisible = document.querySelector(
+                '.form_picker-date[data-picker="date-text-form"]'
+              );
+              const formDateHidden = document.querySelector(
+                '[data-picker="date-hidden-form"]'
+              );
+
+              if (formDateVisible) formDateVisible.value = fancy || "";
+              if (formDateHidden) formDateHidden.value = tech;
+            }
+
+            // Transfer adults and children counts
+            formAdultsCount = heroAdultsCount;
+            formChildrenCount = clampChildrenCount(heroChildrenCount);
+
+            // Update form persons display
+            const pCont = document.querySelector(".form_picker-persons");
+            if (pCont) {
+              // Update adults
+              const formAdultsText = pCont.querySelector(
+                '[data-counter*="adults"]'
+              );
+              if (formAdultsText) {
+                const valA = tCount("adults", formAdultsCount);
+                if (formAdultsText.value !== undefined) {
+                  formAdultsText.value = valA;
+                } else {
+                  formAdultsText.textContent = valA;
+                }
+
+                // Update adults minus button state
+                const aWrap = formAdultsText.closest(
+                  ".form_picker-persons-wrapper"
+                );
+                if (aWrap) {
+                  const minusBtn = aWrap.querySelector(
+                    '[data-controls="minus"]'
+                  );
+                  if (minusBtn) {
+                    if (formAdultsCount === 1) {
+                      minusBtn.classList.add("is-disabled");
+                    } else {
+                      minusBtn.classList.remove("is-disabled");
+                    }
+                  }
+                }
+              }
+
+              // Update children (only if children elements exist)
+              const formChildsText = pCont.querySelector(
+                '[data-counter*="child"]'
+              );
+              if (formChildsText) {
+                const valC = tCount("children", formChildrenCount);
+                if (formChildsText.value !== undefined) {
+                  formChildsText.value = valC;
+                } else {
+                  formChildsText.textContent = valC;
+                }
+
+                // Update children minus button state
+                const cWrap = formChildsText.closest(
+                  ".form_picker-persons-wrapper"
+                );
+                if (cWrap) {
+                  const minusBtn = cWrap.querySelector(
+                    '[data-controls="minus"]'
+                  );
+                  if (minusBtn) {
+                    if (formChildrenCount === 0) {
+                      minusBtn.classList.add("is-disabled");
+                    } else {
+                      minusBtn.classList.remove("is-disabled");
+                    }
+                  }
+
+                  // Update children-specific functionality
+                  updateChildPlusMinusState(cWrap, formChildrenCount);
+                }
+              }
+            }
+
+            // Update nights display and child age items
+            updateNightsDisplay(heroSelectedDates);
+            updateChildAgeItems(formChildrenCount);
+          }
+        });
+      }
+    }, 600);
+  }
+
+  const formDateEl = document.querySelector(
+    '.form_picker-date[data-picker="date-text-form"]'
+  );
+  const formDateHiddenEl = document.querySelector(
+    '[data-picker="date-hidden-form"]'
+  );
+  if (formDateEl) {
+    const flatpickrConfig = {
+      mode: "range",
+      dateFormat: "D., d. M.",
+      minDate: "today",
+      locale: resolveFlatpickrLocale(),
+      static: true,
+      position: "below",
+      onReady: function (sel, ds, inst) {
+        const cal = inst.calendarContainer;
+        if (cal) {
+          cal.classList.add("form_picker_initial-position");
+          const extraFields = cal.querySelectorAll("input[name^='field']");
+          extraFields.forEach((f) => f.removeAttribute("name"));
+        }
+      },
+      onChange: function (sel, ds, inst) {
+        if (!sel || sel.length === 0) {
+          formDateEl.value = "";
+        } else {
+          formDateEl.value = formatFancyRange(sel, inst);
+        }
+        if (formDateHiddenEl) {
+          formDateHiddenEl.value = formatTechnicalRange(sel);
+        }
+        updateNightsDisplay(sel);
+      },
+    };
+
+    formDateInstance = flatpickr(formDateEl, {
+      ...flatpickrConfig,
+      showMonths: window.innerWidth >= 992 ? 2 : 1,
+    });
+
+    window.addEventListener(
+      "resize",
+      debounce(function () {
+        if (!formDateInstance) return;
+
+        const newShowMonths = window.innerWidth >= 992 ? 2 : 1;
+        if (formDateInstance.config.showMonths === newShowMonths) return;
+
+        const currentDates = formDateInstance.selectedDates;
+        formDateInstance.destroy();
+
+        formDateInstance = flatpickr(formDateEl, {
+          ...flatpickrConfig,
+          showMonths: newShowMonths,
+        });
+
+        if (currentDates?.length > 0) {
+          formDateInstance.setDate(currentDates);
+        }
+      }, 250)
+    );
+  }
+
+  function debounce(func, wait) {
+    let timeout;
+    return function () {
+      const context = this,
+        args = arguments;
+      clearTimeout(timeout);
+      timeout = setTimeout(function () {
+        func.apply(context, args);
+      }, wait);
+    };
+  }
+
+  (function initFormPersons() {
+    const pCont = document.querySelector(".form_picker-persons");
+    if (!pCont) return;
+
+    // Find all person wrappers
+    const allWrappers = pCont.querySelectorAll(".form_picker-persons-wrapper");
+    if (allWrappers.length === 0) return;
+
+    // Initialize adults functionality - always try to find it
+    let aWrap = null;
+    let formAdultsText = null;
+
+    // Look for adults wrapper by finding the one with adults counter
+    for (let wrapper of allWrappers) {
+      const counterEl = wrapper.querySelector('[data-counter*="adults"]');
+      if (counterEl) {
+        aWrap = wrapper;
+        formAdultsText = counterEl;
+        break;
+      }
+    }
+
+    // Initialize children functionality - only if present
+    let cWrap = null;
+    let formChildsText = null;
+
+    // Look for children wrapper by finding the one with children/childs counter
+    for (let wrapper of allWrappers) {
+      const counterEl = wrapper.querySelector('[data-counter*="child"]');
+      if (counterEl) {
+        cWrap = wrapper;
+        formChildsText = counterEl;
+        break;
+      }
+    }
+
+    // ADULTS FUNCTIONALITY - Always initialize if found
+    if (aWrap && formAdultsText) {
+      console.log("Initializing adults functionality");
+
+      // Set initial adults text
+      const valA = tCount("adults", formAdultsCount);
+      if (formAdultsText.value !== undefined) {
+        formAdultsText.value = valA;
+      } else {
+        formAdultsText.textContent = valA;
+      }
+
+      // Initialize adults controls
+      const aCtrls = aWrap.querySelectorAll("[data-controls]");
+      aCtrls.forEach(function (ctrl) {
+        ctrl.addEventListener("click", function () {
+          const action = ctrl.getAttribute("data-controls");
+
+          if (action === "plus") {
+            formAdultsCount++;
+          } else if (action === "minus" && formAdultsCount > 1) {
+            formAdultsCount--;
+          }
+
+          // Update adults display
+          const newValA = tCount("adults", formAdultsCount);
+          if (formAdultsText.value !== undefined) {
+            formAdultsText.value = newValA;
+          } else {
+            formAdultsText.textContent = newValA;
+          }
+
+          // Update minus button state for adults
+          const minusBtn = aWrap.querySelector('[data-controls="minus"]');
+          if (minusBtn) {
+            if (formAdultsCount === 1) {
+              minusBtn.classList.add("is-disabled");
+            } else {
+              minusBtn.classList.remove("is-disabled");
+            }
+          }
+        });
+      });
+
+      // Set initial minus button state for adults
+      const initialMinusBtn = aWrap.querySelector('[data-controls="minus"]');
+      if (initialMinusBtn) {
+        if (formAdultsCount === 1) {
+          initialMinusBtn.classList.add("is-disabled");
+        } else {
+          initialMinusBtn.classList.remove("is-disabled");
+        }
+      }
+    } else {
+      console.warn(
+        "Adults form elements not found - adults functionality disabled"
+      );
+    }
+
+    // CHILDREN FUNCTIONALITY - Only initialize if found
+    if (cWrap && formChildsText) {
+      console.log("Initializing children functionality");
+
+      // Set initial children text
+      const valC = tCount("children", formChildrenCount);
+      if (formChildsText.value !== undefined) {
+        formChildsText.value = valC;
+      } else {
+        formChildsText.textContent = valC;
+      }
+
+      // Initialize children controls
+      const cCtrls = cWrap.querySelectorAll("[data-controls]");
+      cCtrls.forEach(function (ctrl) {
+        ctrl.addEventListener("click", function () {
+          const action = ctrl.getAttribute("data-controls");
+
+          if (action === "plus") {
+            formChildrenCount++;
+          } else if (action === "minus" && formChildrenCount > 0) {
+            formChildrenCount--;
+          }
+
+          // Clamp children count based on available age fields
+          formChildrenCount = clampChildrenCount(formChildrenCount);
+
+          // Update children display
+          const newValC = tCount("children", formChildrenCount);
+          if (formChildsText.value !== undefined) {
+            formChildsText.value = newValC;
+          } else {
+            formChildsText.textContent = newValC;
+          }
+
+          // Update minus button state for children
+          const minusBtn = cWrap.querySelector('[data-controls="minus"]');
+          if (minusBtn) {
+            if (formChildrenCount === 0) {
+              minusBtn.classList.add("is-disabled");
+            } else {
+              minusBtn.classList.remove("is-disabled");
+            }
+          }
+
+          // Update child age fields
+          updateChildAgeItems(formChildrenCount);
+
+          // Update plus/minus states for children
+          updateChildPlusMinusState(cWrap, formChildrenCount);
+        });
+      });
+
+      // Set initial states for children
+      setTimeout(() => {
+        updateChildAgeItems(formChildrenCount);
+        updateChildPlusMinusState(cWrap, clampChildrenCount(formChildrenCount));
+      }, 0);
+    } else {
+      console.warn(
+        "Children form elements not found - children functionality disabled"
+      );
+      // Force children count to 0 if no children elements found
+      formChildrenCount = 0;
+    }
+  })();
+
+  (function customValidationSetup() {
+    const myForm = document.querySelector("form[data-form-taxi-url]");
+    if (!myForm) return;
+    function showElement(el, displayType = "block") {
+      el.style.display = displayType;
+      el.style.visibility = "visible";
+    }
+    function hideElement(el) {
+      el.style.display = "none";
+      el.style.visibility = "hidden";
+    }
+    function validateRequiredFields(showErrors = false) {
+      let isFormValid = true;
+      let firstErrorElement = null;
+      document.querySelectorAll("[data-required]").forEach((requiredGroup) => {
+        const inputs = requiredGroup.querySelectorAll(
+          "input, select, textarea"
+        );
+        let isGroupValid = true;
+        inputs.forEach((input) => {
+          if (input.type === "checkbox" || input.type === "radio") {
+          } else {
+            if (input.value.trim() === "") {
+              isGroupValid = false;
+            }
+          }
+        });
+        const checkable = Array.from(inputs).filter(
+          (input) => input.type === "checkbox" || input.type === "radio"
+        );
+        if (checkable.length > 0) {
+          if (!checkable.some((input) => input.checked)) {
+            isGroupValid = false;
+          }
+        }
+        const errorElement = requiredGroup.querySelector(".form_error");
+        if (!isGroupValid) {
+          isFormValid = false;
+          if (showErrors && errorElement) {
+            showElement(errorElement, "block");
+            errorElement.setAttribute("aria-live", "polite");
+          }
+          if (!firstErrorElement) firstErrorElement = errorElement;
+        } else {
+          if (errorElement) {
+            hideElement(errorElement);
+            errorElement.removeAttribute("aria-live");
+          }
+        }
+      });
+      return { isFormValid, firstErrorElement };
+    }
+    // URL aus data-Attribut ziehen, Fail-Fast wenn fehlt
+    const taxiUrl = myForm.dataset.formTaxiUrl;
+    if (!taxiUrl) {
+      console.error("⚠️ data-form-taxi-url fehlt am <form>!");
+      const errorEl = document.createElement("div");
+      errorEl.className = "form_error form-taxi-config-error";
+      errorEl.textContent =
+        "Dieses Formular ist nicht richtig konfiguriert. Bitte kontaktieren Sie den Betreiber.";
+      myForm.parentNode.insertBefore(errorEl, myForm);
+      myForm.style.display = "none";
+      return;
+    }
+    myForm.action = taxiUrl;
+    const thankYouURL = window.location.origin + "/danke";
+    myForm.addEventListener("submit", function (e) {
+      e.preventDefault();
+      const { isFormValid, firstErrorElement } = validateRequiredFields(true);
+      if (!isFormValid) {
+        if (firstErrorElement) {
+          firstErrorElement.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
+        }
+        return;
+      }
+      const submitButton = myForm.querySelector(
+        'button[type="submit"], #submit-button'
+      );
+      let originalText = "";
+      if (submitButton) {
+        originalText = submitButton.textContent;
+        submitButton.disabled = true;
+        submitButton.textContent = "Bitte warten...";
+      }
+      fetch(myForm.action, {
+        method: myForm.method || "POST",
+        body: new FormData(myForm),
+        headers: { Accept: "application/json" },
+      })
+        .then((response) => {
+          if (response.ok) {
+            window.location.href = thankYouURL;
+          } else {
+            throw new Error("Fehler beim Absenden des Formulars.");
+          }
+        })
+        .catch((error) => {
+          console.error(error);
+          const errorMessage = myForm.querySelector(".form_error-message");
+          if (errorMessage) {
+            showElement(errorMessage, "block");
+          }
+          if (submitButton) {
+            submitButton.disabled = false;
+            submitButton.textContent = originalText;
+          }
+        });
+    });
+    document.querySelectorAll("[data-required]").forEach((requiredGroup) => {
+      const inputs = requiredGroup.querySelectorAll("input, select, textarea");
+      inputs.forEach((input) => {
+        input.addEventListener("change", () => {
+          let isValidNow = true;
+          if (input.type === "checkbox" || input.type === "radio") {
+            const checkable = Array.from(
+              requiredGroup.querySelectorAll(
+                "input[type='checkbox'], input[type='radio']"
+              )
+            );
+            if (!checkable.some((inp) => inp.checked)) {
+              isValidNow = false;
+            }
+          } else {
+            if (input.value.trim() === "") {
+              isValidNow = false;
+            }
+          }
+          if (isValidNow) {
+            const errorElement = requiredGroup.querySelector(".form_error");
+            if (errorElement) hideElement(errorElement);
+          }
+        });
+      });
+    });
+  })();
+});
 
 /******************************************************************************
  * NAV SHOW/HIDE
@@ -1828,106 +3090,62 @@ document.addEventListener("DOMContentLoaded", function () {
  *****************************************************************************/
 
 document.addEventListener("DOMContentLoaded", () => {
-  console.log("🏠 ROOMS SECTION: Starting initialization...");
-
   const roomsSection = document.querySelector(".section_rooms");
-  console.log("🏠 ROOMS SECTION: Found section?", !!roomsSection);
-  if (!roomsSection) {
-    console.log("❌ ROOMS SECTION: .section_rooms not found in DOM - exiting");
-    return;
-  }
+  if (!roomsSection) return;
 
   // Tablist (Ebene 1)
   const tabList = roomsSection.querySelector("[data-tab-list]");
-  console.log("🏠 ROOMS SECTION: Found tabList?", !!tabList);
 
   // Tab-Items (Ebene 2) - diese sollten role="tab" haben
   const tabItems = roomsSection.querySelectorAll(".rooms_tabs-collection-item");
-  console.log("🏠 ROOMS SECTION: Found tab items:", tabItems.length);
 
   // Trigger-Elemente (Ebene 3) - diese sollten KEINE ARIA-Attribute haben
   const triggerElements = roomsSection.querySelectorAll("[data-tab]");
-  console.log("🏠 ROOMS SECTION: Found trigger elements:", triggerElements.length);
 
   // Inhalte der Tabs
   const tabContents = roomsSection.querySelectorAll("[data-target-tab]");
-  console.log("🏠 ROOMS SECTION: Found tab contents:", tabContents.length);
 
   // Prüfe auf leere Tabs und blende sie aus
   function hideEmptyTabs() {
-    console.log("🔍 ROOMS SECTION: Starting hideEmptyTabs() check...");
     let visibleTabCount = 0;
     let firstVisibleTabId = null;
 
     // Durchlaufe alle Tab-Trigger und prüfe die zugehörigen Inhalte
-    triggerElements.forEach((trigger, index) => {
+    triggerElements.forEach((trigger) => {
       const tabId = trigger.getAttribute("data-tab");
-      console.log(`\n📋 ROOMS TAB [${index}]: Checking tab with ID: "${tabId}"`);
-
-      if (!tabId) {
-        console.log(`   ⚠️  ROOMS TAB [${index}]: No data-tab attribute found - skipping`);
-        return;
-      }
+      if (!tabId) return;
 
       const tabContent = roomsSection.querySelector(
         `[data-target-tab="${tabId}"]`
       );
-      console.log(`   🎯 ROOMS TAB [${index}]: Found tab content?`, !!tabContent);
-      if (!tabContent) {
-        console.log(`   ❌ ROOMS TAB [${index}]: No matching [data-target-tab="${tabId}"] found - skipping`);
-        return;
-      }
+      if (!tabContent) return;
 
       const tabPane = tabContent.querySelector(".w-dyn-list");
-      console.log(`   📦 ROOMS TAB [${index}]: Found .w-dyn-list?`, !!tabPane);
-      if (!tabPane) {
-        console.log(`   ❌ ROOMS TAB [${index}]: No .w-dyn-list found - skipping`);
-        return;
-      }
+      if (!tabPane) return;
 
       // Prüfe, ob "No items found" Text vorhanden ist oder keine Items in der Liste sind
       const emptyMessage = tabPane.querySelector(".w-dyn-empty");
-      const emptyMessageVisible = emptyMessage && getComputedStyle(emptyMessage).display !== "none";
-      console.log(`   💬 ROOMS TAB [${index}]: .w-dyn-empty exists?`, !!emptyMessage);
-      console.log(`   💬 ROOMS TAB [${index}]: .w-dyn-empty visible?`, emptyMessageVisible);
-
-      const dynItems = tabPane.querySelector(".w-dyn-items");
-      const itemsCount = dynItems?.children.length || 0;
-      console.log(`   📊 ROOMS TAB [${index}]: .w-dyn-items found?`, !!dynItems);
-      console.log(`   📊 ROOMS TAB [${index}]: .w-dyn-items children count:`, itemsCount);
-
-      const hasItems = itemsCount > 0;
-      console.log(`   ✅ ROOMS TAB [${index}]: hasItems?`, hasItems);
+      const hasItems =
+        tabPane.querySelector(".w-dyn-items")?.children.length > 0;
 
       const isEmpty =
         (emptyMessage && getComputedStyle(emptyMessage).display !== "none") ||
         !hasItems;
 
-      console.log(`   🔎 ROOMS TAB [${index}]: isEmpty decision: ${isEmpty}`);
-      console.log(`   🔎 ROOMS TAB [${index}]:   - emptyMessage visible? ${emptyMessageVisible}`);
-      console.log(`   🔎 ROOMS TAB [${index}]:   - OR !hasItems? ${!hasItems}`);
-
       if (isEmpty) {
         // Verstecke den Tab-Trigger (und sein übergeordnetes Element)
         const tabItem = trigger.closest(".rooms_tabs-collection-item");
         if (tabItem) tabItem.style.display = "none";
-        console.log(`   ❌ ROOMS TAB [${index}]: Tab is EMPTY - hiding tab item`);
       } else {
         visibleTabCount++;
         if (!firstVisibleTabId) firstVisibleTabId = tabId;
-        console.log(`   ✅ ROOMS TAB [${index}]: Tab has content - keeping visible (visibleTabCount: ${visibleTabCount})`);
       }
     });
 
-    console.log(`\n📊 ROOMS SECTION: Final visible tab count: ${visibleTabCount}`);
-
     // Wenn es keine sichtbaren Tabs gibt, gesamte Sektion ausblenden
     if (visibleTabCount === 0) {
-      console.log("❌ ROOMS SECTION: NO visible tabs - HIDING entire section");
       roomsSection.style.display = "none";
     } else if (firstVisibleTabId) {
-      console.log(`✅ ROOMS SECTION: ${visibleTabCount} visible tab(s) - showing section`);
-      console.log(`✅ ROOMS SECTION: Setting first visible tab as active: "${firstVisibleTabId}"`);
       // Setze den ersten sichtbaren Tab als aktiv
       setActiveTab(firstVisibleTabId);
       initSwiper(firstVisibleTabId);
@@ -2503,15 +3721,9 @@ document.addEventListener("click", function (e) {
     if (!card) return;
 
     const nameEl = card.querySelector("[data-room-name]");
-    const codeEl = card.querySelector("[data-room-code]");
     const imgEl = card.querySelector("[data-room-image]");
-    const name = nameEl ? (nameEl.getAttribute("data-room-name") || nameEl.textContent.trim()) : "";
-    const code = codeEl ? (codeEl.getAttribute("data-room-code") || codeEl.textContent.trim()) : "";
+    const name = nameEl ? nameEl.textContent.trim() : "";
     const img = imgEl ? imgEl.getAttribute("src") : "";
-
-    // Create combined value for submission: "CODE|Name"
-    // Format: "DBL|Deluxe Double Room" - easy to parse on server with split('|')
-    const roomValue = code && name ? `${code}|${name}` : (name || "");
 
     if (roomNameTarget) {
       if (roomNameTarget.tagName === "INPUT") {
@@ -2522,7 +3734,7 @@ document.addEventListener("click", function (e) {
     }
 
     if (roomImgTarget) roomImgTarget.src = img;
-    if (roomInput) roomInput.value = roomValue;
+    if (roomInput) roomInput.value = name;
 
     if (roomElement) {
       roomElement.style.display = "block";
@@ -2560,20 +3772,9 @@ document.addEventListener("click", function (e) {
     if (!card) return;
 
     const nameEl = card.querySelector("[data-offer-name]");
-    const codeEl = card.querySelector("[data-offer-code]");
     const imgEl = card.querySelector("[data-offer-image]");
-
-    // Get values from either attributes or text content (like room cards)
-    const name = nameEl
-      ? (nameEl.getAttribute("data-offer-name") || nameEl.textContent.trim())
-      : "";
-    const code = codeEl
-      ? (codeEl.getAttribute("data-offer-code") || codeEl.textContent.trim())
-      : "";
+    const name = nameEl ? nameEl.textContent.trim() : "";
     const img = imgEl ? imgEl.getAttribute("src") : "";
-
-    // Create combined value for submission: "CODE|Name" (same pattern as rooms)
-    const offerValue = code && name ? `${code}|${name}` : (name || "");
 
     if (offerNameTarget) {
       if (offerNameTarget.tagName === "INPUT") {
@@ -2584,7 +3785,7 @@ document.addEventListener("click", function (e) {
     }
 
     if (offerImgTarget) offerImgTarget.src = img;
-    if (offerInput) offerInput.value = offerValue;
+    if (offerInput) offerInput.value = name;
 
     if (offerElement) {
       offerElement.style.display = "block";

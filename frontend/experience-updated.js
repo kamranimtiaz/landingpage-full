@@ -1824,200 +1824,90 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 
 /******************************************************************************
- * ROOMS TABS & SWIPER
+ * ROOMS FILTER & SWIPER
  *****************************************************************************/
 
 document.addEventListener("DOMContentLoaded", () => {
-  console.log("🏠 ROOMS SECTION: Starting initialization...");
+  console.log("🏠 ROOMS SECTION: Starting filter initialization...");
 
   const roomsSection = document.querySelector(".section_rooms");
   console.log("🏠 ROOMS SECTION: Found section?", !!roomsSection);
+
   if (!roomsSection) {
     console.log("❌ ROOMS SECTION: .section_rooms not found in DOM - exiting");
     return;
   }
 
-  // Tablist (Ebene 1)
-  const tabList = roomsSection.querySelector("[data-tab-list]");
-  console.log("🏠 ROOMS SECTION: Found tabList?", !!tabList);
+  // Get filter buttons
+  const filterButtons = roomsSection.querySelectorAll("[data-filter-name]");
+  console.log("🏠 ROOMS SECTION: Found filter buttons:", filterButtons.length);
 
-  // Tab-Items (Ebene 2) - diese sollten role="tab" haben
-  const tabItems = roomsSection.querySelectorAll(".rooms_tabs-collection-item");
-  console.log("🏠 ROOMS SECTION: Found tab items:", tabItems.length);
+  // Get all room slides
+  const allSlides = roomsSection.querySelectorAll(".swiper-slide.is-rooms");
+  console.log("🏠 ROOMS SECTION: Found room slides:", allSlides.length);
 
-  // Trigger-Elemente (Ebene 3) - diese sollten KEINE ARIA-Attribute haben
-  const triggerElements = roomsSection.querySelectorAll("[data-tab]");
-  console.log("🏠 ROOMS SECTION: Found trigger elements:", triggerElements.length);
+  // Get swiper container
+  const swiperContainer = roomsSection.querySelector(".swiper.is-rooms");
+  console.log("🏠 ROOMS SECTION: Found swiper container?", !!swiperContainer);
 
-  // Inhalte der Tabs
-  const tabContents = roomsSection.querySelectorAll("[data-target-tab]");
-  console.log("🏠 ROOMS SECTION: Found tab contents:", tabContents.length);
+  // Get the tab pane container (legacy from old tab system)
+  const tabPaneContainer = roomsSection.querySelector(".rooms_tab-pane");
+  console.log("🏠 ROOMS SECTION: Found tab pane container?", !!tabPaneContainer);
 
-  // Prüfe auf leere Tabs und blende sie aus
-  function hideEmptyTabs() {
-    console.log("🔍 ROOMS SECTION: Starting hideEmptyTabs() check...");
-    let visibleTabCount = 0;
-    let firstVisibleTabId = null;
-
-    // Durchlaufe alle Tab-Trigger und prüfe die zugehörigen Inhalte
-    triggerElements.forEach((trigger, index) => {
-      const tabId = trigger.getAttribute("data-tab");
-      console.log(`\n📋 ROOMS TAB [${index}]: Checking tab with ID: "${tabId}"`);
-
-      if (!tabId) {
-        console.log(`   ⚠️  ROOMS TAB [${index}]: No data-tab attribute found - skipping`);
-        return;
-      }
-
-      const tabContent = roomsSection.querySelector(
-        `[data-target-tab="${tabId}"]`
-      );
-      console.log(`   🎯 ROOMS TAB [${index}]: Found tab content?`, !!tabContent);
-      if (!tabContent) {
-        console.log(`   ❌ ROOMS TAB [${index}]: No matching [data-target-tab="${tabId}"] found - skipping`);
-        return;
-      }
-
-      const tabPane = tabContent.querySelector(".w-dyn-list");
-      console.log(`   📦 ROOMS TAB [${index}]: Found .w-dyn-list?`, !!tabPane);
-      if (!tabPane) {
-        console.log(`   ❌ ROOMS TAB [${index}]: No .w-dyn-list found - skipping`);
-        return;
-      }
-
-      // Prüfe, ob "No items found" Text vorhanden ist oder keine Items in der Liste sind
-      const emptyMessage = tabPane.querySelector(".w-dyn-empty");
-      const emptyMessageVisible = emptyMessage && getComputedStyle(emptyMessage).display !== "none";
-      console.log(`   💬 ROOMS TAB [${index}]: .w-dyn-empty exists?`, !!emptyMessage);
-      console.log(`   💬 ROOMS TAB [${index}]: .w-dyn-empty visible?`, emptyMessageVisible);
-
-      const dynItems = tabPane.querySelector(".w-dyn-items");
-      const itemsCount = dynItems?.children.length || 0;
-      console.log(`   📊 ROOMS TAB [${index}]: .w-dyn-items found?`, !!dynItems);
-      console.log(`   📊 ROOMS TAB [${index}]: .w-dyn-items children count:`, itemsCount);
-
-      const hasItems = itemsCount > 0;
-      console.log(`   ✅ ROOMS TAB [${index}]: hasItems?`, hasItems);
-
-      const isEmpty =
-        (emptyMessage && getComputedStyle(emptyMessage).display !== "none") ||
-        !hasItems;
-
-      console.log(`   🔎 ROOMS TAB [${index}]: isEmpty decision: ${isEmpty}`);
-      console.log(`   🔎 ROOMS TAB [${index}]:   - emptyMessage visible? ${emptyMessageVisible}`);
-      console.log(`   🔎 ROOMS TAB [${index}]:   - OR !hasItems? ${!hasItems}`);
-
-      if (isEmpty) {
-        // Verstecke den Tab-Trigger (und sein übergeordnetes Element)
-        const tabItem = trigger.closest(".rooms_tabs-collection-item");
-        if (tabItem) tabItem.style.display = "none";
-        console.log(`   ❌ ROOMS TAB [${index}]: Tab is EMPTY - hiding tab item`);
-      } else {
-        visibleTabCount++;
-        if (!firstVisibleTabId) firstVisibleTabId = tabId;
-        console.log(`   ✅ ROOMS TAB [${index}]: Tab has content - keeping visible (visibleTabCount: ${visibleTabCount})`);
-      }
-    });
-
-    console.log(`\n📊 ROOMS SECTION: Final visible tab count: ${visibleTabCount}`);
-
-    // Wenn es keine sichtbaren Tabs gibt, gesamte Sektion ausblenden
-    if (visibleTabCount === 0) {
-      console.log("❌ ROOMS SECTION: NO visible tabs - HIDING entire section");
-      roomsSection.style.display = "none";
-    } else if (firstVisibleTabId) {
-      console.log(`✅ ROOMS SECTION: ${visibleTabCount} visible tab(s) - showing section`);
-      console.log(`✅ ROOMS SECTION: Setting first visible tab as active: "${firstVisibleTabId}"`);
-      // Setze den ersten sichtbaren Tab als aktiv
-      setActiveTab(firstVisibleTabId);
-      initSwiper(firstVisibleTabId);
-    }
-
-    return { visibleTabCount, firstVisibleTabId };
-  }
-
-  // Setze role="tablist" auf das Tablist-Element
-  if (tabList) {
-    tabList.setAttribute("role", "tablist");
+  // Make sure the tab pane is visible (override old tab system)
+  if (tabPaneContainer) {
+    console.log("🏠 ROOMS SECTION: Ensuring tab pane is visible (removing aria-hidden)");
+    tabPaneContainer.classList.remove("hide");
+    tabPaneContainer.removeAttribute("aria-hidden");
+    tabPaneContainer.style.display = "";
   }
 
   let currentSwiper = null;
+  let currentFilter = "all"; // Track current filter
 
-  function setActiveTab(tabId) {
-    // Visuelles Feedback für Trigger-Elemente zurücksetzen
-    triggerElements.forEach((trigger) => {
-      trigger.classList.remove("is-custom-current");
-    });
-
-    // ARIA-Attribute auf Tab-Elementen (Ebene 2) zurücksetzen
-    tabItems.forEach((tabItem) => {
-      // Das tatsächliche Tab-Element erhält aria-selected="false"
-      tabItem.setAttribute("aria-selected", "false");
-
-      // Sicherstellen, dass eventuell vorhandene Trigger-Elemente kein aria-selected haben
-      const childTrigger = tabItem.querySelector("[data-tab]");
-      if (childTrigger) {
-        childTrigger.removeAttribute("aria-selected");
-      }
-    });
-
-    // Tab-Inhalte ausblenden
-    tabContents.forEach((content) => {
-      content.classList.add("hide");
-      content.setAttribute("aria-hidden", "true");
-    });
-
-    // Aktiven Trigger finden
-    const activeTrigger = roomsSection.querySelector(`[data-tab="${tabId}"]`);
-    if (!activeTrigger) return;
-
-    // Visuelles Feedback für aktiven Trigger
-    activeTrigger.classList.add("is-custom-current");
-
-    // ARIA-Attribute für übergeordnetes Tab-Element setzen
-    const parentTabItem =
-      activeTrigger.closest('[role="tab"]') ||
-      activeTrigger.closest(".rooms_tabs-collection-item");
-    if (parentTabItem) {
-      parentTabItem.setAttribute("aria-selected", "true");
-    }
-
-    // Zugehörigen Inhalt anzeigen
-    const activeContent = roomsSection.querySelector(
-      `[data-target-tab="${tabId}"]`
-    );
-    if (activeContent) {
-      activeContent.classList.remove("hide");
-      activeContent.setAttribute("aria-hidden", "false");
-    }
+  // Hide section if no slides exist
+  if (allSlides.length === 0) {
+    console.log("❌ ROOMS SECTION: NO room slides found - HIDING entire section");
+    roomsSection.style.display = "none";
+    return;
   }
 
-  function initSwiper(tabId) {
+  // Get pagination element (outside swiper container to prevent it from being moved)
+  const paginationEl = roomsSection.querySelector(".rooms_bullets-wrapper");
+
+  // Initialize Swiper
+  function initSwiper() {
+    console.log("🔄 ROOMS SECTION: Initializing Swiper...");
+
     if (currentSwiper) {
-      currentSwiper.destroy();
+      console.log("🔄 ROOMS SECTION: Destroying existing Swiper instance");
+      // Use destroy(false, true) to keep instance but clean up
+      // This prevents pagination from being removed from DOM
+      currentSwiper.destroy(false, true);
       currentSwiper = null;
     }
-    const container = roomsSection.querySelector(`[data-swiper="${tabId}"]`);
-    if (!container) return;
 
-    // Prüfe, ob der Container leer ist
-    const emptyMessage = container.querySelector(".w-dyn-empty");
-    const hasItems =
-      container.querySelector(".w-dyn-items")?.children.length > 0;
-
-    if (
-      (emptyMessage && getComputedStyle(emptyMessage).display !== "none") ||
-      !hasItems
-    ) {
-      return; // Initialisiere den Swiper nicht für leere Container
+    if (!swiperContainer) {
+      console.log("❌ ROOMS SECTION: No swiper container found");
+      return;
     }
 
-    currentSwiper = new Swiper(container, {
+    // Clear any existing pagination bullets before reinit
+    if (paginationEl) {
+      paginationEl.innerHTML = '';
+    }
+
+    currentSwiper = new Swiper(swiperContainer, {
       ...swiperAnimationConfig,
       autoHeight: false,
       slidesPerView: 1.2,
       spaceBetween: 16,
       rewind: false,
+      // Critical for filtering - watch slides and skip hidden ones
+      watchSlidesProgress: true,
+      watchSlidesVisibility: true,
+      // Only count visible slides
+      visibilityFullFit: false,
       navigation: {
         nextEl: ".rooms_next-btn",
         prevEl: ".rooms_prev-btn",
@@ -2027,6 +1917,9 @@ document.addEventListener("DOMContentLoaded", () => {
         clickable: true,
         bulletClass: "rooms_bullet",
         bulletActiveClass: "is-current",
+        renderBullet: function (index, className) {
+          return '<span class="' + className + '" tabindex="0" role="button" aria-label="Go to slide ' + (index + 1) + '"></span>';
+        },
       },
       keyboard: {
         enabled: true,
@@ -2046,27 +1939,209 @@ document.addEventListener("DOMContentLoaded", () => {
           spaceBetween: 48,
         },
       },
+      // Event to log what Swiper sees
+      on: {
+        init: function() {
+          console.log(`🔍 ROOMS SWIPER: Initialized with ${this.slides.length} total slides`);
+          const visibleSlides = Array.from(this.slides).filter(slide =>
+            slide.style.display !== 'none' && !slide.classList.contains('swiper-slide-hidden')
+          );
+          console.log(`🔍 ROOMS SWIPER: ${visibleSlides.length} visible slides detected`);
+        },
+      },
     });
+
+    console.log("✅ ROOMS SECTION: Swiper initialized successfully");
   }
 
-  // Zuerst leere Tabs prüfen und ausblenden
-  const { visibleTabCount, firstVisibleTabId } = hideEmptyTabs();
+  // Store original parent and position for each slide
+  const slideParent = allSlides.length > 0 ? allSlides[0].parentElement : null;
+  const slideDataMap = new Map(); // Store slides and their original order
 
-  // Wenn es sichtbare Tabs gibt, Event-Listener für Klicks hinzufügen
-  if (visibleTabCount > 0) {
-    triggerElements.forEach((trigger) => {
-      // Nur für sichtbare Tabs Event-Listener hinzufügen
-      if (
-        trigger.closest(".rooms_tabs-collection-item")?.style.display !== "none"
-      ) {
-        trigger.addEventListener("click", () => {
-          const tabId = trigger.getAttribute("data-tab");
-          setActiveTab(tabId);
-          initSwiper(tabId);
-        });
+  // Store all slides with their original index
+  allSlides.forEach((slide, index) => {
+    slideDataMap.set(slide, index);
+  });
+
+  // Filter slides by data-filter-name
+  function filterSlides(filterName) {
+    console.log(`\n🔍 ROOMS SECTION: Filtering slides by: "${filterName}"`);
+
+    if (!slideParent) {
+      console.log("❌ ROOMS SECTION: No slide parent container found");
+      return 0;
+    }
+
+    // Add opacity 0 to swiper container to hide the jerk
+    if (swiperContainer) {
+      swiperContainer.style.opacity = '0';
+      swiperContainer.style.transition = 'opacity 0.15s ease-out';
+    }
+
+    // Destroy Swiper first (before DOM manipulation)
+    if (currentSwiper) {
+      console.log("🔄 ROOMS SECTION: Destroying Swiper before filter");
+      // Use destroy(false, true) to prevent pagination from being removed
+      currentSwiper.destroy(false, true);
+      currentSwiper = null;
+    }
+
+    // Clear pagination bullets manually
+    if (paginationEl) {
+      paginationEl.innerHTML = '';
+    }
+
+    // Detach all slides from DOM
+    console.log("🔄 ROOMS SECTION: Detaching all slides from DOM...");
+    allSlides.forEach(slide => {
+      if (slide.parentElement) {
+        slide.parentElement.removeChild(slide);
       }
     });
+
+    let visibleCount = 0;
+    const visibleSlides = [];
+
+    // Determine which slides should be visible
+    allSlides.forEach((slide, index) => {
+      const filterData = slide.querySelector("[data-filter-name]");
+      const slideFilterName = filterData ? filterData.getAttribute("data-filter-name") : null;
+
+      console.log(`   📋 Slide [${index}]: data-filter-name="${slideFilterName}"`);
+
+      if (filterName === "all" || slideFilterName === filterName) {
+        // Prepare slide for display
+        slide.classList.remove("swiper-slide-hidden");
+        slide.style.display = "";
+        slide.removeAttribute("aria-hidden");
+        visibleSlides.push(slide);
+        visibleCount++;
+        console.log(`   ✅ Slide [${index}]: WILL BE VISIBLE`);
+      } else {
+        console.log(`   ❌ Slide [${index}]: WILL BE HIDDEN (removed from DOM)`);
+      }
+    });
+
+    // Reattach only visible slides to DOM in original order
+    console.log(`🔄 ROOMS SECTION: Reattaching ${visibleCount} visible slides to DOM...`);
+    visibleSlides.forEach(slide => {
+      slideParent.appendChild(slide);
+    });
+
+    console.log(`\n📊 ROOMS SECTION: ${visibleCount} visible slides after filtering`);
+
+    // Reinitialize Swiper and fade back in
+    setTimeout(() => {
+      console.log("🔄 ROOMS SECTION: Reinitializing Swiper after filter");
+      initSwiper();
+
+      // Fade in the swiper container
+      if (swiperContainer) {
+        swiperContainer.style.opacity = '1';
+      }
+    }, 10);
+
+    return visibleCount;
   }
+
+  // Set active filter button
+  function setActiveFilter(activeButton) {
+    console.log("🎨 ROOMS SECTION: Setting active filter button");
+
+    // Remove active class from all buttons
+    filterButtons.forEach((btn) => {
+      btn.classList.remove("is-custom-current");
+      const parentItem = btn.closest(".rooms_tabs-collection-item");
+      if (parentItem) {
+        parentItem.setAttribute("aria-selected", "false");
+      }
+    });
+
+    // Add active class to clicked button
+    if (activeButton) {
+      activeButton.classList.add("is-custom-current");
+      const parentItem = activeButton.closest(".rooms_tabs-collection-item");
+      if (parentItem) {
+        parentItem.setAttribute("aria-selected", "true");
+      }
+    }
+  }
+
+  // Check if filter buttons exist and count rooms per filter
+  function checkFilters() {
+    console.log("🔍 ROOMS SECTION: Checking available filters...");
+
+    const filterCounts = {};
+
+    // Count slides per filter
+    allSlides.forEach((slide) => {
+      const filterData = slide.querySelector("[data-filter-name]");
+      const filterName = filterData ? filterData.getAttribute("data-filter-name") : null;
+
+      if (filterName) {
+        filterCounts[filterName] = (filterCounts[filterName] || 0) + 1;
+      }
+    });
+
+    console.log("📊 ROOMS SECTION: Filter counts:", filterCounts);
+
+    // Hide filter buttons that have no matching rooms
+    filterButtons.forEach((btn) => {
+      const filterName = btn.getAttribute("data-filter-name");
+      const count = filterCounts[filterName] || 0;
+      const parentItem = btn.closest(".rooms_tabs-collection-item");
+
+      if (count === 0 && parentItem) {
+        console.log(`   ❌ Hiding filter button: "${filterName}" (0 rooms)`);
+        parentItem.style.display = "none";
+      } else {
+        console.log(`   ✅ Showing filter button: "${filterName}" (${count} rooms)`);
+      }
+    });
+
+    return filterCounts;
+  }
+
+  // Setup event listeners for filter buttons
+  filterButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      const filterName = button.getAttribute("data-filter-name");
+      console.log(`\n🖱️  ROOMS SECTION: Filter button clicked: "${filterName}"`);
+
+      currentFilter = filterName;
+      setActiveFilter(button);
+      filterSlides(filterName);
+    });
+  });
+
+  // Initialize
+  console.log("\n🚀 ROOMS SECTION: Initializing...");
+
+  // Check and hide empty filters
+  checkFilters();
+
+  // Initialize Swiper
+  initSwiper();
+
+  // Set first available filter as active
+  const visibleFilters = Array.from(filterButtons).filter(btn => {
+    const parentItem = btn.closest(".rooms_tabs-collection-item");
+    return !parentItem || parentItem.style.display !== "none";
+  });
+
+  if (visibleFilters.length > 0) {
+    const firstFilter = visibleFilters[0];
+    const firstFilterName = firstFilter.getAttribute("data-filter-name");
+    console.log(`✅ ROOMS SECTION: Setting default filter: "${firstFilterName}"`);
+    currentFilter = firstFilterName;
+    setActiveFilter(firstFilter);
+    filterSlides(firstFilterName);
+  } else {
+    console.log("⚠️  ROOMS SECTION: No visible filters, showing all rooms");
+    filterSlides("all");
+  }
+
+  console.log("\n✅ ROOMS SECTION: Filter system initialized successfully!");
 });
 
 /******************************************************************************

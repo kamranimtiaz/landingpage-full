@@ -654,13 +654,31 @@ document.addEventListener("DOMContentLoaded", function () {
   (function customValidationSetup() {
     window.Webflow ||= [];
     window.Webflow.push(() => {
-      const myForm = document.querySelector("form[data-hotel-code], form[data-hotel-id]");
-      if (!myForm) {
-        console.error("⚠️ Form with data-hotel-code or data-hotel-id not found!");
+      // Detect form type: Custom Worker or Form Taxi
+      const workerForm = document.querySelector("form[data-hotel-code], form[data-hotel-id]");
+      const taxiForm = document.querySelector("form[data-form-taxi-url]");
+
+      // Determine which form system to use
+      let myForm = null;
+      let formType = null;
+
+      if (workerForm && !workerForm.hasAttribute('data-form-taxi-url')) {
+        myForm = workerForm;
+        formType = 'worker';
+      } else if (taxiForm && !taxiForm.hasAttribute('data-hotel-code') && !taxiForm.hasAttribute('data-hotel-id')) {
+        myForm = taxiForm;
+        formType = 'taxi';
+      } else if (workerForm && workerForm.hasAttribute('data-form-taxi-url')) {
+        // Form has both - prefer Worker (data-hotel-code takes precedence)
+        myForm = workerForm;
+        formType = 'worker';
+        console.warn("⚠️ Form has both data-hotel-code and data-form-taxi-url. Using Worker backend.");
+      } else {
+        console.log("ℹ️ No booking form found on this page.");
         return;
       }
 
-      console.log("🔧 Initializing custom form handler...");
+      console.log(`🔧 Initializing ${formType === 'worker' ? 'Custom Worker' : 'Form Taxi'} form handler...`);
 
       function showElement(el, displayType = "block") {
         el.style.display = displayType;
@@ -712,23 +730,45 @@ document.addEventListener("DOMContentLoaded", function () {
         return { isFormValid, firstErrorElement };
       }
 
-      // Get worker URL and hotel code from data attributes
-      const workerUrl = myForm.dataset.workerUrl || "https://hotel-booking-worker.webflowxmemberstack.workers.dev";
-      const hotelCode = myForm.dataset.hotelCode || myForm.dataset.hotelId; // Support both for backward compatibility
-
-      if (!hotelCode) {
-        console.error("⚠️ data-hotel-code (or data-hotel-id) missing on <form>!");
-        const errorEl = document.createElement("div");
-        errorEl.className = "form_error form-taxi-config-error";
-        errorEl.textContent =
-          "Dieses Formular ist nicht richtig konfiguriert. Bitte kontaktieren Sie den Betreiber.";
-        myForm.parentNode.insertBefore(errorEl, myForm);
-        myForm.style.display = "none";
-        return;
-      }
-
-      const submitEndpoint = `${workerUrl}/submit/${hotelCode}`;
+      // Configuration based on form type
+      let submitEndpoint = null;
       const thankYouURL = window.location.origin + "/danke";
+
+      if (formType === 'worker') {
+        // Custom Worker configuration
+        const workerUrl = myForm.dataset.workerUrl || "https://hotel-booking-worker.webflowxmemberstack.workers.dev";
+        const hotelCode = myForm.dataset.hotelCode || myForm.dataset.hotelId;
+
+        if (!hotelCode) {
+          console.error("⚠️ data-hotel-code (or data-hotel-id) missing on <form>!");
+          const errorEl = document.createElement("div");
+          errorEl.className = "form_error form-config-error";
+          errorEl.textContent =
+            "Dieses Formular ist nicht richtig konfiguriert. Bitte kontaktieren Sie den Betreiber.";
+          myForm.parentNode.insertBefore(errorEl, myForm);
+          myForm.style.display = "none";
+          return;
+        }
+
+        submitEndpoint = `${workerUrl}/submit/${hotelCode}`;
+      } else {
+        // Form Taxi configuration
+        const taxiUrl = myForm.dataset.formTaxiUrl;
+
+        if (!taxiUrl) {
+          console.error("⚠️ data-form-taxi-url missing on <form>!");
+          const errorEl = document.createElement("div");
+          errorEl.className = "form_error form-config-error";
+          errorEl.textContent =
+            "Dieses Formular ist nicht richtig konfiguriert. Bitte kontaktieren Sie den Betreiber.";
+          myForm.parentNode.insertBefore(errorEl, myForm);
+          myForm.style.display = "none";
+          return;
+        }
+
+        submitEndpoint = taxiUrl;
+        myForm.action = taxiUrl;
+      }
 
       // Get Webflow success/fail elements
       const doneElement = myForm.querySelector(".w-form-done");
@@ -882,45 +922,80 @@ document.addEventListener("DOMContentLoaded", function () {
         if (jsonData.childAge4 === null) delete jsonData.childAge4;
         if (jsonData.childAge5 === null) delete jsonData.childAge5;
 
-        // Log what we're sending
-        console.log("=== BOOKING FORM SUBMISSION (normalized) ===");
-        console.log("Endpoint:", submitEndpoint);
-        console.log("Hotel Code:", hotelCode);
-        console.log("Normalized Data:", jsonData);
-        console.log("============================================");
+        // Prepare fetch request based on form type
+        let fetchOptions = {};
 
-        fetch(submitEndpoint, {
-          method: "POST",
-          body: JSON.stringify(jsonData),
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-        })
+        if (formType === 'worker') {
+          // Custom Worker: Send JSON
+          console.log("=== BOOKING FORM SUBMISSION (Worker) ===");
+          console.log("Endpoint:", submitEndpoint);
+          console.log("Normalized Data:", jsonData);
+          console.log("========================================");
+
+          fetchOptions = {
+            method: "POST",
+            body: JSON.stringify(jsonData),
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
+          };
+        } else {
+          // Form Taxi: Send FormData
+          console.log("=== BOOKING FORM SUBMISSION (Form Taxi) ===");
+          console.log("Endpoint:", submitEndpoint);
+          console.log("FormData:", rawData);
+          console.log("===========================================");
+
+          fetchOptions = {
+            method: myForm.method || "POST",
+            body: formData, // Send raw FormData for Form Taxi
+            headers: {
+              Accept: "application/json",
+            },
+          };
+        }
+
+        fetch(submitEndpoint, fetchOptions)
           .then((response) => {
             console.log("Response Status:", response.status, response.statusText);
             if (response.ok) {
-              return response.json();
+              if (formType === 'taxi') {
+                // Form Taxi: Just redirect on success
+                return { success: true };
+              } else {
+                // Custom Worker: Parse JSON response
+                return response.json();
+              }
             } else {
-              return response
-                .json()
-                .then((errorData) => {
-                  console.error("Server Error Response:", errorData);
-                  throw new Error(
-                    errorData.message || "Fehler beim Absenden des Formulars."
-                  );
-                })
-                .catch((parseError) => {
-                  console.error("Failed to parse error response:", parseError);
-                  throw new Error("Fehler beim Absenden des Formulars.");
-                });
+              if (formType === 'worker') {
+                return response
+                  .json()
+                  .then((errorData) => {
+                    console.error("Server Error Response:", errorData);
+                    throw new Error(
+                      errorData.message || "Fehler beim Absenden des Formulars."
+                    );
+                  })
+                  .catch((parseError) => {
+                    console.error("Failed to parse error response:", parseError);
+                    throw new Error("Fehler beim Absenden des Formulars.");
+                  });
+              } else {
+                throw new Error("Fehler beim Absenden des Formulars.");
+              }
             }
           })
           .then((data) => {
-            console.log("=== BOOKING SUCCESS ===");
-            console.log("Success Response:", data);
-            console.log("Request ID:", data.requestId);
-            console.log("======================");
+            if (formType === 'worker') {
+              console.log("=== BOOKING SUCCESS (Worker) ===");
+              console.log("Success Response:", data);
+              console.log("Request ID:", data.requestId);
+              console.log("================================");
+            } else {
+              console.log("=== BOOKING SUCCESS (Form Taxi) ===");
+              console.log("====================================");
+            }
 
             // Show Webflow success message if available
             if (doneElement) {

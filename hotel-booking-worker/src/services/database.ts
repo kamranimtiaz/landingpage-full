@@ -20,10 +20,11 @@ export async function storeGuestRequest(env: Env, request: GuestRequest): Promis
       INSERT INTO guest_requests (
         request_id, hotel_code, check_in_date, check_out_date,
         adult_count, children_count, child_ages, selected_room,
-        selected_room_code, selected_room_name,
+        selected_room_code, selected_room_name, selected_offer,
+        selected_offer_code, selected_offer_name,
         gender, first_name, last_name, phone_number, email, language,
         comments, status, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       request.requestId,
       request.hotelCode,
@@ -35,6 +36,9 @@ export async function storeGuestRequest(env: Env, request: GuestRequest): Promis
       request.selectedRoom || null,
       request.selectedRoomCode || null,
       request.selectedRoomName || null,
+      request.selectedOffer || null,
+      request.selectedOfferCode || null,
+      request.selectedOfferName || null,
       request.gender || null,
       request.firstName,
       request.lastName,
@@ -140,6 +144,9 @@ function rowToGuestRequest(row: GuestRequestRow): GuestRequest {
     selectedRoom: row.selected_room || undefined,
     selectedRoomCode: row.selected_room_code || undefined,
     selectedRoomName: row.selected_room_name || undefined,
+    selectedOffer: row.selected_offer || undefined,
+    selectedOfferCode: row.selected_offer_code || undefined,
+    selectedOfferName: row.selected_offer_name || undefined,
     gender: (row.gender as 'Male' | 'Female' | '') || '',
     firstName: row.first_name,
     lastName: row.last_name,

@@ -53,6 +53,9 @@ export interface GuestRequest {
   selectedRoom?: string;
   selectedRoomCode?: string;
   selectedRoomName?: string;
+  selectedOffer?: string;
+  selectedOfferCode?: string;
+  selectedOfferName?: string;
   gender?: 'Male' | 'Female' | '';
   firstName: string;
   lastName: string;
@@ -79,6 +82,9 @@ export interface GuestRequestRow {
   selected_room: string | null;
   selected_room_code: string | null;
   selected_room_name: string | null;
+  selected_offer: string | null;
+  selected_offer_code: string | null;
+  selected_offer_name: string | null;
   gender: string | null;
   first_name: string;
   last_name: string;

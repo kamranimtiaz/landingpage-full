@@ -65,9 +65,32 @@ function generateReservation(request: GuestRequest, hotel: Hotel): string {
   // Build Address (only country if available)
   const addressXml = `\n                                    <Address>\n                                        <CountryName Code="DE"/>\n                                    </Address>`;
 
-  // Build Comments (customer comment)
-  const commentsXml = request.comments
-    ? `\n                <Comments>\n                    <Comment Name="customer comment">\n                        <Text>${escapeXml(request.comments)}</Text>\n                    </Comment>\n                </Comments>`
+  // Build Comments (customer comment, room selection, and offer details)
+  const commentParts: string[] = [];
+
+  // Add room selection info if available
+  if (request.selectedRoomName) {
+    const roomText = request.selectedRoomCode
+      ? `Room Selection: ${escapeXml(request.selectedRoomName)} (${escapeXml(request.selectedRoomCode)})`
+      : `Room Selection: ${escapeXml(request.selectedRoomName)}`;
+    commentParts.push(`                    <Comment Name="additional info">\n                        <Text>${roomText}</Text>\n                    </Comment>`);
+  }
+
+  // Add offer details if available
+  if (request.selectedOfferName) {
+    const offerText = request.selectedOfferCode
+      ? `Offer Selection: ${escapeXml(request.selectedOfferName)} (${escapeXml(request.selectedOfferCode)})`
+      : `Offer Selection: ${escapeXml(request.selectedOfferName)}`;
+    commentParts.push(`                    <Comment Name="additional info">\n                        <Text>${offerText}</Text>\n                    </Comment>`);
+  }
+
+  // Add customer comment if available
+  if (request.comments) {
+    commentParts.push(`                    <Comment Name="customer message">\n                        <Text>${escapeXml(request.comments)}</Text>\n                    </Comment>`);
+  }
+
+  const commentsXml = commentParts.length > 0
+    ? `\n                <Comments>\n${commentParts.join('\n')}\n                </Comments>`
     : '';
 
   // Build RoomType attributes for AlpineBits GuestRequests

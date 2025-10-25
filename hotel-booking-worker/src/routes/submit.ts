@@ -7,7 +7,8 @@ import {
   formatPhoneNumber,
   generateRequestId,
   getISO8601Timestamp,
-  parseRoomSelection
+  parseRoomSelection,
+  parseOfferSelection
 } from '../utils/transformers';
 import { getHotelByCode, storeGuestRequest } from '../services/database';
 
@@ -60,6 +61,9 @@ export async function handleSubmit(c: Context<{ Bindings: Env }>): Promise<Respo
     // Parse room selection (format: "CODE|Name" or just "Name")
     const roomSelection = parseRoomSelection(formData.selectedRoom);
 
+    // Parse offer selection (format: "CODE|Name" or just "Name")
+    const offerSelection = parseOfferSelection(formData.selectedOffer);
+
     // Create guest request object
     const guestRequest: GuestRequest = {
       requestId,
@@ -72,6 +76,9 @@ export async function handleSubmit(c: Context<{ Bindings: Env }>): Promise<Respo
       selectedRoom: roomSelection.raw || undefined,
       selectedRoomCode: roomSelection.code,
       selectedRoomName: roomSelection.name,
+      selectedOffer: offerSelection.raw || undefined,
+      selectedOfferCode: offerSelection.code,
+      selectedOfferName: offerSelection.name,
       gender: formData.salutation,
       firstName: formData.firstName?.trim() || '',
       lastName: formData.lastName?.trim() || '',
