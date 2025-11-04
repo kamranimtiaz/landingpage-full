@@ -1967,8 +1967,8 @@ document.addEventListener("DOMContentLoaded", () => {
   function filterSlides(filterName) {
     console.log(`\n🔍 ROOMS SECTION: Filtering slides by: "${filterName}"`);
 
-    if (!slideParent) {
-      console.log("❌ ROOMS SECTION: No slide parent container found");
+    if (!currentSwiper) {
+      console.log("❌ ROOMS SECTION: No Swiper instance found");
       return 0;
     }
 
@@ -1978,38 +1978,24 @@ document.addEventListener("DOMContentLoaded", () => {
       swiperContainer.style.transition = 'opacity 0.15s ease-out';
     }
 
-    // Destroy Swiper first (before DOM manipulation)
-    if (currentSwiper) {
-      console.log("🔄 ROOMS SECTION: Destroying Swiper before filter");
-      // Use destroy(false, true) to prevent pagination from being removed
-      currentSwiper.destroy(false, true);
-      currentSwiper = null;
-    }
-
-    // Clear pagination bullets manually
-    if (paginationEl) {
-      paginationEl.innerHTML = '';
-    }
-
-    // Detach all slides from DOM
-    console.log("🔄 ROOMS SECTION: Detaching all slides from DOM...");
-    allSlides.forEach(slide => {
-      if (slide.parentElement) {
-        slide.parentElement.removeChild(slide);
-      }
-    });
-
     let visibleCount = 0;
     const visibleSlides = [];
 
     // Determine which slides should be visible
     allSlides.forEach((slide, index) => {
+      // Backward compatibility: check inside card content first, then on card itself
       const filterData = slide.querySelector("[data-filter-name]");
-      const slideFilterName = filterData ? filterData.getAttribute("data-filter-name") : null;
+      let slideFilterName = filterData ? filterData.getAttribute("data-filter-name") : null;
+
+      // If not found inside, check the slide itself
+      if (!slideFilterName) {
+        slideFilterName = slide.getAttribute("data-filter-name");
+      }
 
       console.log(`   📋 Slide [${index}]: data-filter-name="${slideFilterName}"`);
 
-      if (filterName === "all" || slideFilterName === filterName) {
+      // Show all slides if filter is "*" or "all"
+      if (filterName === "*" || filterName === "all" || slideFilterName === filterName) {
         // Prepare slide for display
         slide.classList.remove("swiper-slide-hidden");
         slide.style.display = "";
@@ -2022,23 +2008,29 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
 
-    // Reattach only visible slides to DOM in original order
-    console.log(`🔄 ROOMS SECTION: Reattaching ${visibleCount} visible slides to DOM...`);
-    visibleSlides.forEach(slide => {
-      slideParent.appendChild(slide);
-    });
-
     console.log(`\n📊 ROOMS SECTION: ${visibleCount} visible slides after filtering`);
 
-    // Reinitialize Swiper and fade back in
-    setTimeout(() => {
-      console.log("🔄 ROOMS SECTION: Reinitializing Swiper after filter");
-      initSwiper();
+    // Remove all slides from Swiper
+    console.log("🔄 ROOMS SECTION: Removing all slides from Swiper...");
+    currentSwiper.removeAllSlides();
 
-      // Fade in the swiper container
+    // Append only visible slides back to Swiper
+    console.log(`🔄 ROOMS SECTION: Adding ${visibleCount} filtered slides to Swiper...`);
+    currentSwiper.appendSlide(visibleSlides);
+
+    // Update Swiper to refresh layout and pagination
+    console.log("🔄 ROOMS SECTION: Updating Swiper layout...");
+    currentSwiper.update();
+
+    // Slide to first slide
+    currentSwiper.slideTo(0, 0);
+
+    // Fade in the swiper container
+    setTimeout(() => {
       if (swiperContainer) {
         swiperContainer.style.opacity = '1';
       }
+      console.log("✅ ROOMS SECTION: Filter applied successfully");
     }, 10);
 
     return visibleCount;
@@ -2075,8 +2067,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Count slides per filter
     allSlides.forEach((slide) => {
+      // Backward compatibility: check inside card content first, then on card itself
       const filterData = slide.querySelector("[data-filter-name]");
-      const filterName = filterData ? filterData.getAttribute("data-filter-name") : null;
+      let filterName = filterData ? filterData.getAttribute("data-filter-name") : null;
+
+      // If not found inside, check the slide itself
+      if (!filterName) {
+        filterName = slide.getAttribute("data-filter-name");
+      }
 
       if (filterName) {
         filterCounts[filterName] = (filterCounts[filterName] || 0) + 1;
@@ -2085,17 +2083,26 @@ document.addEventListener("DOMContentLoaded", () => {
 
     console.log("📊 ROOMS SECTION: Filter counts:", filterCounts);
 
-    // Hide filter buttons that have no matching rooms
+    // Hide filter buttons that have no matching rooms (except "*" which shows all)
     filterButtons.forEach((btn) => {
       const filterName = btn.getAttribute("data-filter-name");
       const count = filterCounts[filterName] || 0;
       const parentItem = btn.closest(".rooms_tabs-collection-item");
 
-      if (count === 0 && parentItem) {
+      // Never hide the "*" filter as it shows all items
+      if (filterName === "*") {
+        console.log(`   ⭐ Keeping filter button: "*" (shows all rooms)`);
+        if (parentItem) {
+          parentItem.style.display = "";
+        }
+      } else if (count === 0 && parentItem) {
         console.log(`   ❌ Hiding filter button: "${filterName}" (0 rooms)`);
         parentItem.style.display = "none";
       } else {
         console.log(`   ✅ Showing filter button: "${filterName}" (${count} rooms)`);
+        if (parentItem) {
+          parentItem.style.display = "";
+        }
       }
     });
 
@@ -2123,19 +2130,30 @@ document.addEventListener("DOMContentLoaded", () => {
   // Initialize Swiper
   initSwiper();
 
-  // Set first available filter as active
+  // Get all visible filters
   const visibleFilters = Array.from(filterButtons).filter(btn => {
     const parentItem = btn.closest(".rooms_tabs-collection-item");
     return !parentItem || parentItem.style.display !== "none";
   });
 
-  if (visibleFilters.length > 0) {
-    const firstFilter = visibleFilters[0];
-    const firstFilterName = firstFilter.getAttribute("data-filter-name");
-    console.log(`✅ ROOMS SECTION: Setting default filter: "${firstFilterName}"`);
-    currentFilter = firstFilterName;
-    setActiveFilter(firstFilter);
-    filterSlides(firstFilterName);
+  // Look for "*" filter first, otherwise use first visible filter
+  let defaultFilter = null;
+  const starFilter = visibleFilters.find(btn => btn.getAttribute("data-filter-name") === "*");
+
+  if (starFilter) {
+    defaultFilter = starFilter;
+    console.log(`⭐ ROOMS SECTION: Using "*" filter as default (shows all rooms)`);
+  } else if (visibleFilters.length > 0) {
+    defaultFilter = visibleFilters[0];
+    console.log(`✅ ROOMS SECTION: Using first visible filter as default`);
+  }
+
+  if (defaultFilter) {
+    const filterName = defaultFilter.getAttribute("data-filter-name");
+    console.log(`✅ ROOMS SECTION: Setting default filter: "${filterName}"`);
+    currentFilter = filterName;
+    setActiveFilter(defaultFilter);
+    filterSlides(filterName);
   } else {
     console.log("⚠️  ROOMS SECTION: No visible filters, showing all rooms");
     filterSlides("all");
@@ -2145,158 +2163,90 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 /******************************************************************************
- * OFFERS TABS & SWIPER
+ * OFFERS FILTER & SWIPER
  *****************************************************************************/
 
 document.addEventListener("DOMContentLoaded", () => {
+  console.log("🎁 OFFERS SECTION: Starting filter initialization...");
+
   const offersSection = document.querySelector(".section_offers");
-  if (!offersSection) return;
+  console.log("🎁 OFFERS SECTION: Found section?", !!offersSection);
 
-  // Tablist (Ebene 1)
-  const tabList = offersSection.querySelector("[data-tab-list]");
-
-  // Tab-Items (Ebene 2) - diese sollten role="tab" haben
-  const tabItems = offersSection.querySelectorAll(
-    ".offers_tabs-collection-item"
-  );
-
-  // Trigger-Elemente (Ebene 3) - diese sollten KEINE ARIA-Attribute haben
-  const triggerElements = offersSection.querySelectorAll("[data-tab]");
-
-  // Inhalte der Tabs
-  const tabContents = offersSection.querySelectorAll("[data-target-tab]");
-
-  // Prüfe auf leere Tabs und blende sie aus
-  function hideEmptyTabs() {
-    let visibleTabCount = 0;
-    let firstVisibleTabId = null;
-
-    // Durchlaufe alle Tab-Trigger und prüfe die zugehörigen Inhalte
-    triggerElements.forEach((trigger) => {
-      const tabId = trigger.getAttribute("data-tab");
-      if (!tabId) return;
-
-      const tabContent = offersSection.querySelector(
-        `[data-target-tab="${tabId}"]`
-      );
-      if (!tabContent) return;
-
-      const tabPane = tabContent.querySelector(".w-dyn-list");
-      if (!tabPane) return;
-
-      // Prüfe, ob "No items found" Text vorhanden ist oder keine Items in der Liste sind
-      const emptyMessage = tabPane.querySelector(".w-dyn-empty");
-      const hasItems =
-        tabPane.querySelector(".w-dyn-items")?.children.length > 0;
-
-      const isEmpty =
-        (emptyMessage && getComputedStyle(emptyMessage).display !== "none") ||
-        !hasItems;
-
-      if (isEmpty) {
-        // Verstecke den Tab-Trigger (und sein übergeordnetes Element)
-        const tabItem = trigger.closest(".offers_tabs-collection-item");
-        if (tabItem) tabItem.style.display = "none";
-      } else {
-        visibleTabCount++;
-        if (!firstVisibleTabId) firstVisibleTabId = tabId;
-      }
-    });
-
-    // Wenn es keine sichtbaren Tabs gibt, gesamte Sektion ausblenden
-    if (visibleTabCount === 0) {
-      offersSection.style.display = "none";
-    } else if (firstVisibleTabId) {
-      // Setze den ersten sichtbaren Tab als aktiv
-      setActiveTab(firstVisibleTabId);
-      initSwiper(firstVisibleTabId);
-    }
-
-    return { visibleTabCount, firstVisibleTabId };
+  if (!offersSection) {
+    console.log("❌ OFFERS SECTION: .section_offers not found in DOM - exiting");
+    return;
   }
 
-  // Setze role="tablist" auf das Tablist-Element
-  if (tabList) {
-    tabList.setAttribute("role", "tablist");
+  // Get filter buttons
+  const filterButtons = offersSection.querySelectorAll("[data-filter-name]");
+  console.log("🎁 OFFERS SECTION: Found filter buttons:", filterButtons.length);
+
+  // Get all offer slides
+  const allSlides = offersSection.querySelectorAll(".swiper-slide.is-offers");
+  console.log("🎁 OFFERS SECTION: Found offer slides:", allSlides.length);
+
+  // Get swiper container
+  const swiperContainer = offersSection.querySelector(".swiper.is-offers");
+  console.log("🎁 OFFERS SECTION: Found swiper container?", !!swiperContainer);
+
+  // Get the tab pane container (legacy from old tab system)
+  const tabPaneContainer = offersSection.querySelector(".offers_tab-pane");
+  console.log("🎁 OFFERS SECTION: Found tab pane container?", !!tabPaneContainer);
+
+  // Make sure the tab pane is visible (override old tab system)
+  if (tabPaneContainer) {
+    console.log("🎁 OFFERS SECTION: Ensuring tab pane is visible (removing aria-hidden)");
+    tabPaneContainer.classList.remove("hide");
+    tabPaneContainer.removeAttribute("aria-hidden");
+    tabPaneContainer.style.display = "";
   }
 
   let currentSwiper = null;
+  let currentFilter = "all"; // Track current filter
 
-  function setActiveTab(tabId) {
-    // Visuelles Feedback für Trigger-Elemente zurücksetzen
-    triggerElements.forEach((trigger) => {
-      trigger.classList.remove("is-custom-current");
-    });
-
-    // ARIA-Attribute auf Tab-Elementen (Ebene 2) zurücksetzen
-    tabItems.forEach((tabItem) => {
-      // Das tatsächliche Tab-Element erhält aria-selected="false"
-      tabItem.setAttribute("aria-selected", "false");
-
-      // Sicherstellen, dass eventuell vorhandene Trigger-Elemente kein aria-selected haben
-      const childTrigger = tabItem.querySelector("[data-tab]");
-      if (childTrigger) {
-        childTrigger.removeAttribute("aria-selected");
-      }
-    });
-
-    // Tab-Inhalte ausblenden
-    tabContents.forEach((content) => {
-      content.classList.add("hide");
-      content.setAttribute("aria-hidden", "true");
-    });
-
-    // Aktiven Trigger finden
-    const activeTrigger = offersSection.querySelector(`[data-tab="${tabId}"]`);
-    if (!activeTrigger) return;
-
-    // Visuelles Feedback für aktiven Trigger
-    activeTrigger.classList.add("is-custom-current");
-
-    // ARIA-Attribute für übergeordnetes Tab-Element setzen
-    const parentTabItem =
-      activeTrigger.closest('[role="tab"]') ||
-      activeTrigger.closest(".offers_tabs-collection-item");
-    if (parentTabItem) {
-      parentTabItem.setAttribute("aria-selected", "true");
-    }
-
-    // Zugehörigen Inhalt anzeigen
-    const activeContent = offersSection.querySelector(
-      `[data-target-tab="${tabId}"]`
-    );
-    if (activeContent) {
-      activeContent.classList.remove("hide");
-      activeContent.setAttribute("aria-hidden", "false");
-    }
+  // Hide section if no slides exist
+  if (allSlides.length === 0) {
+    console.log("❌ OFFERS SECTION: NO offer slides found - HIDING entire section");
+    offersSection.style.display = "none";
+    return;
   }
 
-  function initSwiper(tabId) {
+  // Get pagination element (outside swiper container to prevent it from being moved)
+  const paginationEl = offersSection.querySelector(".offers_bullets-wrapper");
+
+  // Initialize Swiper
+  function initSwiper() {
+    console.log("🔄 OFFERS SECTION: Initializing Swiper...");
+
     if (currentSwiper) {
-      currentSwiper.destroy();
+      console.log("🔄 OFFERS SECTION: Destroying existing Swiper instance");
+      // Use destroy(false, true) to keep instance but clean up
+      // This prevents pagination from being removed from DOM
+      currentSwiper.destroy(false, true);
       currentSwiper = null;
     }
-    const container = offersSection.querySelector(`[data-swiper="${tabId}"]`);
-    if (!container) return;
 
-    // Prüfe, ob der Container leer ist
-    const emptyMessage = container.querySelector(".w-dyn-empty");
-    const hasItems =
-      container.querySelector(".w-dyn-items")?.children.length > 0;
-
-    if (
-      (emptyMessage && getComputedStyle(emptyMessage).display !== "none") ||
-      !hasItems
-    ) {
-      return; // Initialisiere den Swiper nicht für leere Container
+    if (!swiperContainer) {
+      console.log("❌ OFFERS SECTION: No swiper container found");
+      return;
     }
 
-    currentSwiper = new Swiper(container, {
+    // Clear any existing pagination bullets before reinit
+    if (paginationEl) {
+      paginationEl.innerHTML = '';
+    }
+
+    currentSwiper = new Swiper(swiperContainer, {
       ...swiperAnimationConfig,
       autoHeight: false,
       slidesPerView: 1.2,
       spaceBetween: 16,
       rewind: false,
+      // Critical for filtering - watch slides and skip hidden ones
+      watchSlidesProgress: true,
+      watchSlidesVisibility: true,
+      // Only count visible slides
+      visibilityFullFit: false,
       navigation: {
         nextEl: ".offers_next-btn",
         prevEl: ".offers_prev-btn",
@@ -2306,6 +2256,9 @@ document.addEventListener("DOMContentLoaded", () => {
         clickable: true,
         bulletClass: "offers_bullet",
         bulletActiveClass: "is-current",
+        renderBullet: function (index, className) {
+          return '<span class="' + className + '" tabindex="0" role="button" aria-label="Go to slide ' + (index + 1) + '"></span>';
+        },
       },
       keyboard: {
         enabled: true,
@@ -2325,28 +2278,227 @@ document.addEventListener("DOMContentLoaded", () => {
           spaceBetween: 48,
         },
       },
+      // Event to log what Swiper sees
+      on: {
+        init: function() {
+          console.log(`🔍 OFFERS SWIPER: Initialized with ${this.slides.length} total slides`);
+          const visibleSlides = Array.from(this.slides).filter(slide =>
+            slide.style.display !== 'none' && !slide.classList.contains('swiper-slide-hidden')
+          );
+          console.log(`🔍 OFFERS SWIPER: ${visibleSlides.length} visible slides detected`);
+        },
+      },
     });
+
+    console.log("✅ OFFERS SECTION: Swiper initialized successfully");
   }
 
-  // Zuerst leere Tabs prüfen und ausblenden
-  const { visibleTabCount, firstVisibleTabId } = hideEmptyTabs();
+  // Store original parent and position for each slide
+  const slideParent = allSlides.length > 0 ? allSlides[0].parentElement : null;
+  const slideDataMap = new Map(); // Store slides and their original order
 
-  // Wenn es sichtbare Tabs gibt, Event-Listener für Klicks hinzufügen
-  if (visibleTabCount > 0) {
-    triggerElements.forEach((trigger) => {
-      // Nur für sichtbare Tabs Event-Listener hinzufügen
-      if (
-        trigger.closest(".offers_tabs-collection-item")?.style.display !==
-        "none"
-      ) {
-        trigger.addEventListener("click", () => {
-          const tabId = trigger.getAttribute("data-tab");
-          setActiveTab(tabId);
-          initSwiper(tabId);
-        });
+  // Store all slides with their original index
+  allSlides.forEach((slide, index) => {
+    slideDataMap.set(slide, index);
+  });
+
+  // Filter slides by data-filter-name
+  function filterSlides(filterName) {
+    console.log(`\n🔍 OFFERS SECTION: Filtering slides by: "${filterName}"`);
+
+    if (!currentSwiper) {
+      console.log("❌ OFFERS SECTION: No Swiper instance found");
+      return 0;
+    }
+
+    // Add opacity 0 to swiper container to hide the jerk
+    if (swiperContainer) {
+      swiperContainer.style.opacity = '0';
+      swiperContainer.style.transition = 'opacity 0.15s ease-out';
+    }
+
+    let visibleCount = 0;
+    const visibleSlides = [];
+
+    // Determine which slides should be visible
+    allSlides.forEach((slide, index) => {
+      // Backward compatibility: check inside card content first, then on card itself
+      const filterData = slide.querySelector("[data-filter-name]");
+      let slideFilterName = filterData ? filterData.getAttribute("data-filter-name") : null;
+
+      // If not found inside, check the slide itself
+      if (!slideFilterName) {
+        slideFilterName = slide.getAttribute("data-filter-name");
+      }
+
+      console.log(`   📋 Slide [${index}]: data-filter-name="${slideFilterName}"`);
+
+      // Show all slides if filter is "*" or "all"
+      if (filterName === "*" || filterName === "all" || slideFilterName === filterName) {
+        // Prepare slide for display
+        slide.classList.remove("swiper-slide-hidden");
+        slide.style.display = "";
+        slide.removeAttribute("aria-hidden");
+        visibleSlides.push(slide);
+        visibleCount++;
+        console.log(`   ✅ Slide [${index}]: WILL BE VISIBLE`);
+      } else {
+        console.log(`   ❌ Slide [${index}]: WILL BE HIDDEN (removed from DOM)`);
       }
     });
+
+    console.log(`\n📊 OFFERS SECTION: ${visibleCount} visible slides after filtering`);
+
+    // Remove all slides from Swiper
+    console.log("🔄 OFFERS SECTION: Removing all slides from Swiper...");
+    currentSwiper.removeAllSlides();
+
+    // Append only visible slides back to Swiper
+    console.log(`�� OFFERS SECTION: Adding ${visibleCount} filtered slides to Swiper...`);
+    currentSwiper.appendSlide(visibleSlides);
+
+    // Update Swiper to refresh layout and pagination
+    console.log("🔄 OFFERS SECTION: Updating Swiper layout...");
+    currentSwiper.update();
+
+    // Slide to first slide
+    currentSwiper.slideTo(0, 0);
+
+    // Fade in the swiper container
+    setTimeout(() => {
+      if (swiperContainer) {
+        swiperContainer.style.opacity = '1';
+      }
+      console.log("✅ OFFERS SECTION: Filter applied successfully");
+    }, 10);
+
+    return visibleCount;
   }
+
+  // Set active filter button
+  function setActiveFilter(activeButton) {
+    console.log("🎨 OFFERS SECTION: Setting active filter button");
+
+    // Remove active class from all buttons
+    filterButtons.forEach((btn) => {
+      btn.classList.remove("is-custom-current");
+      const parentItem = btn.closest(".offers_tabs-collection-item");
+      if (parentItem) {
+        parentItem.setAttribute("aria-selected", "false");
+      }
+    });
+
+    // Add active class to clicked button
+    if (activeButton) {
+      activeButton.classList.add("is-custom-current");
+      const parentItem = activeButton.closest(".offers_tabs-collection-item");
+      if (parentItem) {
+        parentItem.setAttribute("aria-selected", "true");
+      }
+    }
+  }
+
+  // Check if filter buttons exist and count offers per filter
+  function checkFilters() {
+    console.log("🔍 OFFERS SECTION: Checking available filters...");
+
+    const filterCounts = {};
+
+    // Count slides per filter
+    allSlides.forEach((slide) => {
+      // Backward compatibility: check inside card content first, then on card itself
+      const filterData = slide.querySelector("[data-filter-name]");
+      let filterName = filterData ? filterData.getAttribute("data-filter-name") : null;
+
+      // If not found inside, check the slide itself
+      if (!filterName) {
+        filterName = slide.getAttribute("data-filter-name");
+      }
+
+      if (filterName) {
+        filterCounts[filterName] = (filterCounts[filterName] || 0) + 1;
+      }
+    });
+
+    console.log("📊 OFFERS SECTION: Filter counts:", filterCounts);
+
+    // Hide filter buttons that have no matching offers (except "*" which shows all)
+    filterButtons.forEach((btn) => {
+      const filterName = btn.getAttribute("data-filter-name");
+      const count = filterCounts[filterName] || 0;
+      const parentItem = btn.closest(".offers_tabs-collection-item");
+
+      // Never hide the "*" filter as it shows all items
+      if (filterName === "*") {
+        console.log(`   ⭐ Keeping filter button: "*" (shows all offers)`);
+        if (parentItem) {
+          parentItem.style.display = "";
+        }
+      } else if (count === 0 && parentItem) {
+        console.log(`   ❌ Hiding filter button: "${filterName}" (0 offers)`);
+        parentItem.style.display = "none";
+      } else {
+        console.log(`   ✅ Showing filter button: "${filterName}" (${count} offers)`);
+        if (parentItem) {
+          parentItem.style.display = "";
+        }
+      }
+    });
+
+    return filterCounts;
+  }
+
+  // Setup event listeners for filter buttons
+  filterButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      const filterName = button.getAttribute("data-filter-name");
+      console.log(`\n🖱️  OFFERS SECTION: Filter button clicked: "${filterName}"`);
+
+      currentFilter = filterName;
+      setActiveFilter(button);
+      filterSlides(filterName);
+    });
+  });
+
+  // Initialize
+  console.log("\n🚀 OFFERS SECTION: Initializing...");
+
+  // Check and hide empty filters
+  checkFilters();
+
+  // Initialize Swiper
+  initSwiper();
+
+  // Get all visible filters
+  const visibleFilters = Array.from(filterButtons).filter(btn => {
+    const parentItem = btn.closest(".offers_tabs-collection-item");
+    return !parentItem || parentItem.style.display !== "none";
+  });
+
+  // Look for "*" filter first, otherwise use first visible filter
+  let defaultFilter = null;
+  const starFilter = visibleFilters.find(btn => btn.getAttribute("data-filter-name") === "*");
+
+  if (starFilter) {
+    defaultFilter = starFilter;
+    console.log(`⭐ OFFERS SECTION: Using "*" filter as default (shows all offers)`);
+  } else if (visibleFilters.length > 0) {
+    defaultFilter = visibleFilters[0];
+    console.log(`✅ OFFERS SECTION: Using first visible filter as default`);
+  }
+
+  if (defaultFilter) {
+    const filterName = defaultFilter.getAttribute("data-filter-name");
+    console.log(`✅ OFFERS SECTION: Setting default filter: "${filterName}"`);
+    currentFilter = filterName;
+    setActiveFilter(defaultFilter);
+    filterSlides(filterName);
+  } else {
+    console.log("⚠️  OFFERS SECTION: No visible filters, showing all offers");
+    filterSlides("all");
+  }
+
+  console.log("\n✅ OFFERS SECTION: Filter system initialized successfully!");
 });
 
 /******************************************************************************

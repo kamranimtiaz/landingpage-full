@@ -244,17 +244,29 @@ export function generateErrorResponse(errorMessage: string, timeStamp: string): 
  */
 export function parsePingRequest(xml: string): { echoData: string; capabilities: AlpineBitsCapabilities } | null {
   try {
+    console.log('=== parsePingRequest Debug ===');
+    console.log('XML input length:', xml?.length);
+    console.log('XML contains OTA_PingRQ?:', xml?.includes('OTA_PingRQ'));
+    console.log('XML contains EchoData?:', xml?.includes('EchoData'));
+
     // Extract EchoData content (contains JSON)
     const echoDataMatch = xml.match(/<EchoData>([\s\S]*?)<\/EchoData>/);
 
+    console.log('EchoData regex match?:', !!echoDataMatch);
+
     if (!echoDataMatch) {
+      console.log('ERROR: No EchoData match found');
+      console.log('First 500 chars of XML:', xml?.substring(0, 500));
       return null;
     }
 
     const echoData = echoDataMatch[1].trim();
+    console.log('Extracted EchoData length:', echoData.length);
+    console.log('EchoData preview:', echoData.substring(0, 100));
 
     // Parse the JSON inside EchoData
     const capabilities = JSON.parse(echoData) as AlpineBitsCapabilities;
+    console.log('Successfully parsed JSON, versions count:', capabilities.versions?.length);
 
     return {
       echoData,
@@ -262,6 +274,7 @@ export function parsePingRequest(xml: string): { echoData: string; capabilities:
     };
   } catch (error) {
     console.error('Error parsing ping request:', error);
+    console.error('Error details:', error instanceof Error ? error.message : String(error));
     return null;
   }
 }

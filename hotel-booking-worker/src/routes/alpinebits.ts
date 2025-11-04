@@ -40,7 +40,7 @@ export async function handleAlpineBits(c: Context<{ Bindings: Env }>): Promise<R
     // Parse multipart form data
     const formData = await c.req.formData();
     const action = formData.get('action');
-    const request = formData.get('request');
+    const requestField = formData.get('request');
 
     // Validate action parameter
     if (!action || typeof action !== 'string') {
@@ -48,6 +48,39 @@ export async function handleAlpineBits(c: Context<{ Bindings: Env }>): Promise<R
         status: 400,
         headers: { 'Content-Type': 'text/plain' }
       });
+    }
+
+    console.log('=== Action Debug ===');
+    console.log('action:', action);
+
+    // Extract request content (might be a File or string)
+    let request: string | null = null;
+    if (requestField) {
+      console.log('=== FormData Debug ===');
+      console.log('requestField type:', typeof requestField);
+      console.log('requestField constructor:', requestField.constructor?.name);
+
+      if (typeof requestField === 'object' && requestField !== null && 'text' in requestField) {
+        // If it's a File object, read its content
+        request = await (requestField as File).text();
+        console.log('Extracted from File, length:', request.length);
+        console.log('First 200 chars:', request.substring(0, 200));
+        console.log('Last 200 chars:', request.substring(Math.max(0, request.length - 200)));
+        console.log('Contains OTA_PingRQ?:', request.includes('OTA_PingRQ'));
+        console.log('Contains </OTA_PingRQ>?:', request.includes('</OTA_PingRQ>'));
+      } else if (typeof requestField === 'string') {
+        // If it's already a string, use it directly
+        request = requestField;
+        console.log('Using string directly, length:', request.length);
+        console.log('First 200 chars:', request.substring(0, 200));
+        console.log('Last 200 chars:', request.substring(Math.max(0, request.length - 200)));
+        console.log('Contains OTA_PingRQ?:', request.includes('OTA_PingRQ'));
+        console.log('Contains </OTA_PingRQ>?:', request.includes('</OTA_PingRQ>'));
+      } else {
+        console.log('WARNING: Unknown requestField type');
+      }
+    } else {
+      console.log('WARNING: requestField is null/undefined');
     }
 
     // Handle different action types
@@ -180,14 +213,23 @@ function handlePingRequest(
   _c: Context<{ Bindings: Env }>,
   xmlBody: string
 ): Response {
+  // Debug: Log the received XML
+  console.log('=== OTA_PingRQ Debug ===');
+  console.log('XML Body type:', typeof xmlBody);
+  console.log('XML Body length:', xmlBody?.length || 0);
+  console.log('XML Body preview:', xmlBody?.substring(0, 500));
+
   const parsed = parsePingRequest(xmlBody);
 
   if (!parsed) {
+    console.log('ERROR: Failed to parse OTA_PingRQ');
     return new Response('ERROR:invalid OTA_PingRQ format or missing EchoData', {
       status: 400,
       headers: { 'Content-Type': 'text/plain' }
     });
   }
+
+  console.log('Successfully parsed OTA_PingRQ');
 
   // Get server's supported capabilities
   const serverCapabilities = getServerCapabilities();
