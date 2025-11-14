@@ -148,7 +148,7 @@ export function generateAcknowledgeResponse(
   timeStamp: string
 ): string {
   const warnings = acknowledgedIds.map(id =>
-    `    <Warning Type="3" Code="450">${id} acknowledged</Warning>`
+    `    <Warning Type="3">${id} acknowledged</Warning>`
   ).join('\n');
 
   return `<?xml version="1.0" encoding="UTF-8"?>
@@ -260,16 +260,30 @@ export function parsePingRequest(xml: string): { echoData: string; capabilities:
       return null;
     }
 
-    const echoData = echoDataMatch[1].trim();
-    console.log('Extracted EchoData length:', echoData.length);
-    console.log('EchoData preview:', echoData.substring(0, 100));
+    // Keep the ORIGINAL EchoData exactly as sent (with HTML entities)
+    // AlpineBits spec requires: "the content of the EchoData element must be identical to what the client sent"
+    const originalEchoData = echoDataMatch[1].trim();
+    console.log('Extracted EchoData length:', originalEchoData.length);
+    console.log('EchoData preview (original):', originalEchoData.substring(0, 100));
 
-    // Parse the JSON inside EchoData
-    const capabilities = JSON.parse(echoData) as AlpineBitsCapabilities;
-    console.log('Successfully parsed JSON, versions count:', capabilities.versions?.length);
+    // HTML-decode ONLY for JSON parsing (ASA sends it with HTML entities)
+    // Replace common HTML entities with their actual characters
+    const decodedEchoData = originalEchoData
+      .replace(/&quot;/g, '"')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&apos;/g, "'");
 
+    console.log('EchoData preview (decoded):', decodedEchoData.substring(0, 100));
+
+    // Parse the decoded JSON
+    const capabilities = JSON.parse(decodedEchoData) as AlpineBitsCapabilities;
+    console.log('✓ Successfully parsed JSON, versions count:', capabilities.versions?.length);
+
+    // Return the ORIGINAL (not decoded) EchoData for the response
     return {
-      echoData,
+      echoData: originalEchoData,
       capabilities
     };
   } catch (error) {
@@ -380,12 +394,9 @@ export function generatePingResponse(
     .join('\n')
     .trim();
 
-  // EchoData should be exactly what the client sent
-  const echoDataIndented = echoData
-    .split('\n')
-    .map(line => '    ' + line)
-    .join('\n')
-    .trim();
+  // EchoData must be EXACTLY what the client sent - no modifications!
+  // Do NOT add indentation, newlines, or any other characters
+  // AlpineBits spec: "the content of the EchoData element must be identical to what the client sent"
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <OTA_PingRS xmlns="http://www.opentravel.org/OTA/2003/05" Version="1.0">
@@ -395,8 +406,6 @@ export function generatePingResponse(
 ${intersectionJson}
     </Warning>
   </Warnings>
-  <EchoData>
-${echoDataIndented}
-  </EchoData>
+  <EchoData>${echoData}</EchoData>
 </OTA_PingRS>`;
 }

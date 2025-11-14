@@ -28,9 +28,17 @@ export async function handleAlpineBits(c: Context<{ Bindings: Env }>): Promise<R
   try {
     const timeStamp = getISO8601Timestamp();
 
+    console.log('=== NEW ALPINEBITS REQUEST ===');
+    console.log('Timestamp:', timeStamp);
+    console.log('Client Protocol:', c.req.header('X-AlpineBits-ClientProtocolVersion'));
+    console.log('Client ID:', c.req.header('X-AlpineBits-ClientID'));
+
     // Check Content-Type
     const contentType = c.req.header('Content-Type');
+    console.log('Content-Type:', contentType);
+
     if (!contentType?.includes('multipart/form-data')) {
+      console.error('❌ Invalid content type');
       return new Response('ERROR:invalid content type, multipart/form-data required', {
         status: 400,
         headers: { 'Content-Type': 'text/plain' }
@@ -38,9 +46,16 @@ export async function handleAlpineBits(c: Context<{ Bindings: Env }>): Promise<R
     }
 
     // Parse multipart form data
+    console.log('⏳ Parsing FormData...');
     const formData = await c.req.formData();
+    console.log('✓ FormData parsed');
+    console.log('FormData keys:', Array.from(formData.keys()));
+
     const action = formData.get('action');
     const requestField = formData.get('request');
+
+    console.log('action value:', action);
+    console.log('requestField present:', !!requestField);
 
     // Validate action parameter
     if (!action || typeof action !== 'string') {

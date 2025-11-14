@@ -7,12 +7,21 @@ import { Env } from '../types';
  * Also validates required AlpineBits headers
  */
 export async function alpineBitsAuth(c: Context<{ Bindings: Env }>, next: Next): Promise<Response | void> {
+  console.log('===  AUTH MIDDLEWARE ===');
+  console.log('URL:', c.req.url);
+  console.log('Method:', c.req.method);
+
   const authHeader = c.req.header('Authorization');
   const clientProtocolVersion = c.req.header('X-AlpineBits-ClientProtocolVersion');
   const clientId = c.req.header('X-AlpineBits-ClientID');
 
+  console.log('X-AlpineBits-ClientProtocolVersion:', clientProtocolVersion);
+  console.log('X-AlpineBits-ClientID:', clientId);
+  console.log('Authorization header present:', !!authHeader);
+
   // Check for required X-AlpineBits-ClientProtocolVersion header
   if (!clientProtocolVersion) {
+    console.error('❌ Missing X-AlpineBits-ClientProtocolVersion header');
     return new Response('ERROR:missing X-AlpineBits-ClientProtocolVersion header', {
       status: 400,
       headers: { 'Content-Type': 'text/plain' }

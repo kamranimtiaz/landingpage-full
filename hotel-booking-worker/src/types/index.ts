@@ -39,6 +39,7 @@ export interface WebflowFormData {
   email: string;
   comments?: string;
   privacyConsent?: boolean;
+  origin?: string;
 }
 
 // Parsed and validated guest request
@@ -63,6 +64,7 @@ export interface GuestRequest {
   email: string;
   language: string;
   comments?: string;
+  origin?: string;
   status: 'pending' | 'sent' | 'acknowledged';
   createdAt: string;
   sentAt?: string;
@@ -92,6 +94,7 @@ export interface GuestRequestRow {
   email: string;
   language: string;
   comments: string | null;
+  origin: string | null;
   status: string;
   created_at: string;
   sent_at: string | null;

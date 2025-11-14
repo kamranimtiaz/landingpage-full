@@ -86,6 +86,7 @@ export async function handleSubmit(c: Context<{ Bindings: Env }>): Promise<Respo
       email: formData.email.trim(),
       language: formData.language || 'de',
       comments: formData.comments?.trim(),
+      origin: formData.origin?.trim(),
       status: 'pending',
       createdAt: getISO8601Timestamp()
     };

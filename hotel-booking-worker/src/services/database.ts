@@ -23,8 +23,8 @@ export async function storeGuestRequest(env: Env, request: GuestRequest): Promis
         selected_room_code, selected_room_name, selected_offer,
         selected_offer_code, selected_offer_name,
         gender, first_name, last_name, phone_number, email, language,
-        comments, status, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        comments, origin, status, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       request.requestId,
       request.hotelCode,
@@ -46,6 +46,7 @@ export async function storeGuestRequest(env: Env, request: GuestRequest): Promis
       request.email,
       request.language,
       request.comments || null,
+      request.origin || null,
       request.status,
       request.createdAt
     ).run();
