@@ -3245,7 +3245,16 @@ document.addEventListener("click", function (e) {
 
     const nameEl = card.querySelector("[data-room-name]");
     const imgEl = card.querySelector("[data-room-image]");
-    const name = nameEl ? nameEl.textContent.trim() : "";
+    // Use innerText to respect display:none elements, or get last meaningful text node
+    let name = "";
+    if (nameEl) {
+      // Try to get innerText first (respects CSS visibility)
+      name = nameEl.innerText?.trim() || nameEl.textContent.trim();
+      // If it still has pipes, extract only the part after the last pipe
+      if (name.includes('|')) {
+        name = name.split('|').pop()?.trim() || name;
+      }
+    }
     const img = imgEl ? imgEl.getAttribute("src") : "";
 
     if (roomNameTarget) {

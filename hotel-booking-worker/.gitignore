@@ -8,3 +8,7 @@ dist/
 .vscode/
 .idea/
 .claude
+
+# Credentials (never commit filled credentials)
+CREDENTIALS_FILLED.md
+*_CREDENTIALS.md

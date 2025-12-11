@@ -10,12 +10,12 @@ enabled = true
 [[d1_databases]]
 binding = "DB"
 database_name = "hotel-booking-db"
-database_id = "c9ea493f-0381-40e9-a706-066b8dacf7b1"
+database_id = "fd9eba10-98bb-4462-943f-87f2eba3c945"
 
 # KV for caching
 [[kv_namespaces]]
 binding = "CACHE"
-id = "2180d0ea72b14cf8a1ec98b74c8f2822"
+id = "55bbd5b3ad2c43d8b0385d17bc21ec26"
 
 # Environment variables
 [vars]

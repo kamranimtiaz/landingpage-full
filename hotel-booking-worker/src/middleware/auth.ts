@@ -1,12 +1,12 @@
 import { Context, Next } from 'hono';
-import { Env } from '../types';
+import { Env, Variables } from '../types';
 
 /**
  * AlpineBits Basic Authentication Middleware
  * Validates HTTP Basic Access Authentication as per AlpineBits specification
  * Also validates required AlpineBits headers
  */
-export async function alpineBitsAuth(c: Context<{ Bindings: Env }>, next: Next): Promise<Response | void> {
+export async function alpineBitsAuth(c: Context<{ Bindings: Env; Variables: Variables }>, next: Next): Promise<Response | void> {
   console.log('===  AUTH MIDDLEWARE ===');
   console.log('URL:', c.req.url);
   console.log('Method:', c.req.method);
@@ -97,6 +97,80 @@ export async function alpineBitsAuth(c: Context<{ Bindings: Env }>, next: Next):
     clientProtocolVersion,
     clientId: clientId || undefined
   });
+
+  // Authentication successful, proceed to next handler
+  await next();
+}
+
+/**
+ * Admin Basic Authentication Middleware
+ * Validates HTTP Basic Access Authentication for admin endpoints
+ * Separate from AlpineBits auth - used for admin dashboard and management endpoints
+ */
+export async function adminAuth(c: Context<{ Bindings: Env }>, next: Next): Promise<Response | void> {
+  console.log('=== ADMIN AUTH MIDDLEWARE ===');
+  console.log('URL:', c.req.url);
+  console.log('Method:', c.req.method);
+
+  const authHeader = c.req.header('Authorization');
+
+  // Check if admin credentials are configured
+  const expectedUsername = c.env.ADMIN_USERNAME;
+  const expectedPassword = c.env.ADMIN_PASSWORD;
+
+  if (!expectedUsername || !expectedPassword) {
+    console.error('ADMIN_USERNAME or ADMIN_PASSWORD is not configured');
+    return c.json({
+      success: false,
+      error: 'AUTH_NOT_CONFIGURED',
+      message: 'Admin authentication is not properly configured'
+    }, 500);
+  }
+
+  // Validate Authorization header format
+  if (!authHeader || !authHeader.startsWith('Basic ')) {
+    return c.json({
+      success: false,
+      error: 'MISSING_AUTH',
+      message: 'Admin authentication required. Provide credentials via HTTP Basic Auth.'
+    }, 401, {
+      'WWW-Authenticate': 'Basic realm="Admin"'
+    });
+  }
+
+  // Extract and decode base64 credentials
+  const base64Credentials = authHeader.substring(6); // Remove 'Basic ' prefix
+  let credentials: string;
+
+  try {
+    credentials = atob(base64Credentials);
+  } catch (error) {
+    console.warn('Invalid base64 encoding in Authorization header');
+    return c.json({
+      success: false,
+      error: 'INVALID_AUTH',
+      message: 'Invalid authentication credentials format'
+    }, 401, {
+      'WWW-Authenticate': 'Basic realm="Admin"'
+    });
+  }
+
+  // Split username and password
+  const [username, password] = credentials.split(':');
+
+  // Validate credentials
+  if (username !== expectedUsername || password !== expectedPassword) {
+    console.warn('Invalid admin credentials attempt');
+    return c.json({
+      success: false,
+      error: 'INVALID_CREDENTIALS',
+      message: 'Invalid username or password'
+    }, 401, {
+      'WWW-Authenticate': 'Basic realm="Admin"'
+    });
+  }
+
+  console.log('✓ Admin authentication successful');
 
   // Authentication successful, proceed to next handler
   await next();

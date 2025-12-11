@@ -96,24 +96,19 @@ function generateReservation(request: GuestRequest, hotel: Hotel): string {
   // Build RoomType attributes for AlpineBits GuestRequests
   // RoomTypeCode: The actual room code for AlpineBits mapping (e.g., "DBL", "SGL")
   // This is the code used by the hotel's PMS/booking system
+  // Note: RoomType and RoomClassificationCode are intentionally omitted as they should
+  // only be included when we have actual data. This accommodates various property types
+  // (apartments, studios, etc.) that don't fit standard hotel room classifications.
   const roomTypeCodeAttr = request.selectedRoomCode
     ? ` RoomTypeCode="${escapeXml(request.selectedRoomCode)}"`
     : '';
-
-  // RoomType: OTA standard room category
-  // 1=Single, 2=Double, 3=Triple, 4=Quad, 5=Suite, 6=Apartment, 7=Studio, 8=Family, 9=Resting places
-  const roomTypeAttr = ` RoomType="1"`;
-
-  // RoomClassificationCode: Required when RoomType is specified (AlpineBits requirement)
-  // 42 = Standard room classification
-  const roomClassificationCodeAttr = ` RoomClassificationCode="42"`;
 
   return `        <HotelReservation CreateDateTime="${request.createdAt}" ResStatus="Requested">
             <UniqueID Type="14" ID="${request.requestId}"/>
             <RoomStays>
                 <RoomStay>
                     <RoomTypes>
-                        <RoomType${roomTypeCodeAttr}${roomTypeAttr}${roomClassificationCodeAttr}/>
+                        <RoomType${roomTypeCodeAttr}/>
                     </RoomTypes>
                     <GuestCounts>${guestCountsXml.join('')}
                     </GuestCounts>
@@ -142,15 +137,11 @@ function generateReservation(request: GuestRequest, hotel: Hotel): string {
 
 /**
  * Generate AlpineBits OTA_NotifReportRS XML response
+ * Simple success response without warnings
  */
 export function generateAcknowledgeResponse(
-  acknowledgedIds: string[],
   timeStamp: string
 ): string {
-  const warnings = acknowledgedIds.map(id =>
-    `    <Warning Type="3">${id} acknowledged</Warning>`
-  ).join('\n');
-
   return `<?xml version="1.0" encoding="UTF-8"?>
 <OTA_NotifReportRS xmlns="http://www.opentravel.org/OTA/2003/05"
                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
@@ -158,9 +149,6 @@ export function generateAcknowledgeResponse(
                    TimeStamp="${timeStamp}"
                    Version="7.000">
   <Success/>
-  <Warnings>
-${warnings}
-  </Warnings>
 </OTA_NotifReportRS>`;
 }
 

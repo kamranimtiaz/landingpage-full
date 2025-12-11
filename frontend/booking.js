@@ -9,6 +9,13 @@ document.addEventListener("DOMContentLoaded", function () {
     form.setAttribute("action", "#");
   }
 
+  // Populate traffic-origin field with current page URL
+  const trafficOriginField = document.querySelector('input[name="traffic-origin"], input[id="traffic-origin"]');
+  if (trafficOriginField) {
+    trafficOriginField.value = window.location.href;
+    console.log('Traffic origin set to:', window.location.href);
+  }
+
   let heroSelectedDates = [];
   let heroAdultsCount = 2;
   let heroChildrenCount = 0;
@@ -912,7 +919,10 @@ document.addEventListener("DOMContentLoaded", function () {
           comments: rawData.Anmerkung || rawData.comments || "",
 
           // Privacy consent
-          privacyConsent: rawData.Privacy === "on" || rawData.privacyConsent === "on"
+          privacyConsent: rawData.Privacy === "on" || rawData.privacyConsent === "on",
+
+          // Traffic origin (page URL)
+          origin: rawData["traffic-origin"] || ""
         };
 
         // Remove null child ages to keep payload clean

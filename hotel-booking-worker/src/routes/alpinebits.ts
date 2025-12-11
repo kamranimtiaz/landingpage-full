@@ -213,7 +213,7 @@ async function handleAcknowledgeRequest(
   await markRequestsAsAcknowledged(c.env, parsed.requestIds);
 
   // Generate success response
-  const responseXml = generateAcknowledgeResponse(parsed.requestIds, timeStamp);
+  const responseXml = generateAcknowledgeResponse(timeStamp);
 
   return new Response(responseXml, {
     status: 200,

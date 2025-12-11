@@ -2,10 +2,13 @@
 export interface Env {
   DB: D1Database;
   CACHE: KVNamespace;
-  // AlpineBits authentication (HTTP Basic Auth)
+  // AlpineBits authentication (HTTP Basic Auth) - for ASA system
   ALPINEBITS_USERNAME?: string;
   ALPINEBITS_PASSWORD?: string;
   ALPINEBITS_REQUIRE_CLIENT_ID?: string;
+  // Admin authentication (HTTP Basic Auth) - for admin dashboard
+  ADMIN_USERNAME?: string;
+  ADMIN_PASSWORD?: string;
   // Optional API key for other endpoints
   API_KEY?: string;
   ENVIRONMENT?: string;
