@@ -55,7 +55,7 @@ export async function handleSubmit(c: Context<{ Bindings: Env }>): Promise<Respo
     // Parse and transform data (now much simpler with normalized input)
     const { checkIn, checkOut } = parseDateRange(formData.period);
     const childAges = extractChildAges(formData);
-    const phoneNumber = formData.phone ? formatPhoneNumber(formData.phone) : '';
+    const phoneNumber = formData.phone ? formatPhoneNumber(formData.phone, formData.language) : '';
     const requestId = generateRequestId(hotelCode);
 
     // Parse room selection (format: "CODE|Name" or just "Name")

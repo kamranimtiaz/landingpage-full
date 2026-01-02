@@ -32,23 +32,107 @@ export function extractChildAges(data: WebflowFormData): number[] {
 }
 
 /**
- * Format phone number with German country code
+ * Language to country code mapping
+ * Maps language codes to their respective country calling codes
  */
-export function formatPhoneNumber(phone: string): string {
+const LANGUAGE_TO_COUNTRY_CODE: { [key: string]: string } = {
+  'de': '49',   // Germany
+  'it': '39',   // Italy
+  'fr': '33',   // France
+  'en': '44',   // United Kingdom (default for English)
+  'es': '34',   // Spain
+  'pt': '351',  // Portugal
+  'nl': '31',   // Netherlands
+  'pl': '48',   // Poland
+  'cs': '420',  // Czech Republic
+  'sk': '421',  // Slovakia
+  'hu': '36',   // Hungary
+  'ro': '40',   // Romania
+  'bg': '359',  // Bulgaria
+  'hr': '385',  // Croatia
+  'sl': '386',  // Slovenia
+  'sr': '381',  // Serbia
+  'ru': '7',    // Russia
+  'uk': '380',  // Ukraine
+  'tr': '90',   // Turkey
+  'ar': '966',  // Arabic - Saudi Arabia (default)
+  'zh': '86',   // Chinese - China (default)
+  'ja': '81',   // Japan
+  'ko': '82',   // Korea
+};
+
+/**
+ * Special handling for multi-country languages
+ * Switzerland uses multiple languages but one country code
+ */
+const SWITZERLAND_LANGUAGES = ['de-ch', 'fr-ch', 'it-ch', 'rm-ch'];
+
+/**
+ * Format phone number with appropriate country code based on language
+ * If language is not recognized, returns the phone number as-is (no country code added)
+ */
+export function formatPhoneNumber(phone: string, language?: string): string {
   // Remove all non-digit characters
   let digits = phone.replace(/\D/g, '');
 
-  // If it starts with 0, remove it and add +49
+  // If empty after cleaning, return original
+  if (!digits) {
+    return phone;
+  }
+
+  // If no language provided, return number as-is without modification
+  if (!language) {
+    return phone;
+  }
+
+  // Normalize language code to lowercase
+  const lang = language.toLowerCase().trim();
+
+  // Check if it's a Swiss language variant
+  if (SWITZERLAND_LANGUAGES.includes(lang)) {
+    // Switzerland country code
+    const countryCode = '41';
+
+    // If it starts with 0, remove it
+    if (digits.startsWith('0')) {
+      digits = digits.substring(1);
+    }
+
+    // If it doesn't start with country code, add +41
+    if (!digits.startsWith(countryCode)) {
+      return `+${countryCode}${digits}`;
+    }
+
+    return `+${digits}`;
+  }
+
+  // Extract base language code (e.g., 'de' from 'de-DE' or 'de-AT')
+  const baseLanguage = lang.split('-')[0];
+  const countryCode = LANGUAGE_TO_COUNTRY_CODE[baseLanguage];
+
+  // If language is not recognized, return the number as-is without adding country code
+  if (!countryCode) {
+    return phone;
+  }
+
+  // If it starts with 0, remove it (common in European phone numbers)
   if (digits.startsWith('0')) {
     digits = digits.substring(1);
   }
 
-  // If it doesn't start with country code, add +49
-  if (!digits.startsWith('49')) {
-    return `+49${digits}`;
+  // Check if number already has a country code
+  // Try to match against all possible country codes
+  const hasCountryCode = Object.values(LANGUAGE_TO_COUNTRY_CODE).some(code =>
+    digits.startsWith(code)
+  );
+
+  if (hasCountryCode) {
+    // Already has a country code, just add + if missing
+    return `+${digits}`;
   }
 
-  return `+${digits}`;
+  // Add the appropriate country code
+  return `+${countryCode}${digits}`;
 }
 
 /**
